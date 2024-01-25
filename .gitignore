@@ -1,0 +1,10 @@
+build/
+bin/
+obj/
+.vs/
+*SWIGTYP*
+MKFNet.cs
+MKFNet.so
+MKFNetCSHARP_wrap.cxx
+MKFNetModule.cs
+MKFNetModulePINVOKE.cs
