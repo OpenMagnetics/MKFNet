@@ -10,9 +10,12 @@
 		<None Include="MKFNet.dll" Condition="$([MSBuild]::IsOSPlatform('Windows'))">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</None>
-		<None Include="MKFNet.so" Condition="$([MSBuild]::IsOSPlatform('Linux'))" >
+		<None Include="MKFNet.so" Condition="$([MSBuild]::IsOSPlatform('Linux'))">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</None>
 	</ItemGroup>
+<ItemGroup>
+  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+</ItemGroup>
 
 </Project>

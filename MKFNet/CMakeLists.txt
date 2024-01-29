@@ -2,19 +2,22 @@ cmake_minimum_required(VERSION 3.16)
 
 project(MKFWrapperProj VERSION 1.0 LANGUAGES CXX)
 
-if ( MSVC )
-  set(SWIG_DIR "C:/Users/sorus/workspace/swigwin-4.0.2/Lib")
-  set(SWIG_EXECUTABLE "C:/Users/sorus/workspace/swigwin-4.0.2/swig.exe")  
-endif (MSVC)
-
-
 option(BUILD_TESTS      "Build tests"    OFF)
 option(BUILD_EXAMPLES   "Build examples" OFF)
 option(UTPP_INCLUDE_TESTS_IN_BUILD   "Build tests" OFF)
 option(INCLUDE_MKF_TESTS      "Build tests"    OFF)
 
-set(CMAKE_CXX_STANDARD 23) 
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(EMBED_MAS_DATA ON)
+set(EMBED_MAS_CORES ON)
+set(EMBED_MAS_CORE_SHAPES ON)
+set(EMBED_MAS_CORE_MATERIALS ON)
+set(EMBED_MAS_WIRES ON)
+set(EMBED_MAS_WIRE_MATERIALS ON)
+set(EMBED_MAS_BOBBINS ON)
+set(EMBED_MAS_INSULATION_MATERIALS ON)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj")
@@ -22,9 +25,16 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W0")
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 else ()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-deprecated-declarations -Wno-unused-parameter -Wno-switch")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")
+    if (WIN32)
+        # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto")
+        # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -W")
+        # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -allow-multiple-definition")
+        # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fuse-linker-plugin")
+    else ()
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-deprecated-declarations -Wno-unused-parameter -Wno-switch")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")
+    endif()
     set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
     # set(CMAKE_BUILD_TYPE RelWithDebInfo)
@@ -103,7 +113,6 @@ add_custom_command(
   USES_TERMINAL)
 
 add_custom_target(MASNetGeneration
-                  /bin/echo "RUNNING MASNetGeneration"
                   DEPENDS "${MAS_DIRECTORY}/MAS.hpp")
 
 file(GLOB SOURCES MKFNet.i MKFNet.cpp ${CMAKE_BINARY_DIR}/_deps/mkf-src/src/*.cpp)

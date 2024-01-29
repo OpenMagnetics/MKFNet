@@ -7,14 +7,17 @@
 #include "MagneticSimulator.h"
 #include "InputsWrapper.h"
 #include "CoreWrapper.h"
+#include "MagneticWrapper.h"
 #include "Reluctance.h"
 #include "MagnetizingInductance.h"
+#include "MagneticAdviser.h"
 #include "CoreLosses.h"
 #include "CoreTemperature.h"
 #include "CoreAdviser.h"
 #include "Utils.h"
 #include "Settings.h"
-
+#include "Painter.h"
+#include <vector>
 
 MKFNet::MKFNet(){
 }
@@ -26,10 +29,60 @@ std::string MKFNet::GetMaterial(std::string materialName) {
     return result.dump(4);
 }
 
-std::string MKFNet::CalculateCoreLosses(std::string coreData, std::string coilData, std::string inputsData, std::string modelsData) {
-    OpenMagnetics::CoreWrapper core(json::parse(coreData));
-    OpenMagnetics::CoilWrapper coil(json::parse(coilData));
-    OpenMagnetics::InputsWrapper inputs(json::parse(inputsData));
+std::string MKFNet::CalculateCoreData(std::string coreDataString, bool includeMaterialData){
+    OpenMagnetics::CoreWrapper core(json::parse(coreDataString), includeMaterialData);
+    json result;
+    to_json(result, core);
+    return result.dump(4);
+}
+
+std::string MKFNet::Wind(std::string coilString, std::string proportionPerWindingString, std::string patternString, size_t repetitions) {
+    auto coilJson = json::parse(coilString);
+    std::vector<double> proportionPerWinding = json::parse(proportionPerWindingString);
+    std::vector<size_t> pattern = json::parse(patternString);
+    auto coilFunctionalDescription = std::vector<OpenMagnetics::CoilFunctionalDescription>(coilJson["functionalDescription"]);
+    OpenMagnetics::CoilWrapper coil;
+    coil.set_bobbin(coilJson["bobbin"]);
+    coil.set_functional_description(coilFunctionalDescription);
+    if (proportionPerWinding.size() == coilFunctionalDescription.size()) {
+        if (pattern.size() > 0 && repetitions > 0) {
+            coil.wind(proportionPerWinding, pattern, repetitions);
+        }
+        else {
+            coil.wind();
+        }
+    }
+    else {
+        if (pattern.size() > 0 && repetitions > 0) {
+            coil.wind(pattern, repetitions);
+        }
+        else {
+            coil.wind();
+        }
+    }
+
+    json result;
+    to_json(result, coil);
+    return result.dump(4);
+}
+
+std::string MKFNet::GetDefaultModels() {
+    json models;
+    auto reluctanceModelName = magic_enum::enum_name(OpenMagnetics::Defaults().reluctanceModelDefault);
+    models["reluctance"] = reluctanceModelName;
+    auto coreLossesModelName = magic_enum::enum_name(OpenMagnetics::Defaults().coreLossesModelDefault);
+    models["coreLosses"] = coreLossesModelName;
+    auto coreTemperatureModelName = magic_enum::enum_name(OpenMagnetics::Defaults().coreTemperatureModelDefault);
+    models["coreTemperature"] = coreTemperatureModelName;
+
+    return models.dump();
+}
+
+std::string MKFNet::CalculateCoreLosses(std::string magneticString, std::string inputsString, std::string modelsString) {
+    OpenMagnetics::MagneticWrapper magnetic(json::parse(magneticString));
+    OpenMagnetics::CoreWrapper core = magnetic.get_core();
+    OpenMagnetics::CoilWrapper coil = magnetic.get_coil();
+    OpenMagnetics::InputsWrapper inputs(json::parse(inputsString));
     auto operatingPoint = inputs.get_operating_point(0);
     OpenMagnetics::OperatingPointExcitation excitation = operatingPoint.get_excitations_per_winding()[0];
     double magnetizingInductance = OpenMagnetics::resolve_dimensional_values(inputs.get_design_requirements().get_magnetizing_inductance());
@@ -41,7 +94,7 @@ std::string MKFNet::CalculateCoreLosses(std::string coreData, std::string coilDa
 
     auto defaults = OpenMagnetics::Defaults();
 
-    std::map<std::string, std::string> models = json::parse(modelsData).get<std::map<std::string, std::string>>();
+    std::map<std::string, std::string> models = json::parse(modelsString).get<std::map<std::string, std::string>>();
 
     auto reluctanceModelName = defaults.reluctanceModelDefault;
     if (models.find("reluctance") != models.end()) {
@@ -61,10 +114,6 @@ std::string MKFNet::CalculateCoreLosses(std::string coreData, std::string coilDa
         std::transform(modelNameStringUpper.begin(), modelNameStringUpper.end(), modelNameStringUpper.begin(), ::toupper);
         coreTemperatureModelName = magic_enum::enum_cast<OpenMagnetics::CoreTemperatureModels>(modelNameStringUpper).value();
     }
-
-    OpenMagnetics::Magnetic magnetic;
-    magnetic.set_core(core);
-    magnetic.set_coil(coil);
 
     OpenMagnetics::MagneticSimulator magneticSimulator;
     magneticSimulator.set_core_losses_model_name(coreLossesModelName);
@@ -88,4 +137,204 @@ std::string MKFNet::CalculateCoreLosses(std::string coreData, std::string coilDa
     }
 
     return result.dump(4);
+}
+
+std::string MKFNet::CalculateAdvisedCores(std::string inputsString, std::string weightsString, int maximumNumberResults, bool useOnlyCoresInStock){
+    OpenMagnetics::InputsWrapper inputs(json::parse(inputsString));
+    std::map<std::string, double> weightsKeysString = json::parse(weightsString);
+    std::map<OpenMagnetics::CoreAdviser::CoreAdviserFilters, double> weights;
+
+    for (auto const& pair : weightsKeysString) {
+        weights[magic_enum::enum_cast<OpenMagnetics::CoreAdviser::CoreAdviserFilters>(pair.first).value()] = pair.second;
+    }
+    weights[OpenMagnetics::CoreAdviser::CoreAdviserFilters::AREA_PRODUCT] = 1;
+    weights[OpenMagnetics::CoreAdviser::CoreAdviserFilters::ENERGY_STORED] = 1;
+    weights[OpenMagnetics::CoreAdviser::CoreAdviserFilters::COST] = 1;
+    weights[OpenMagnetics::CoreAdviser::CoreAdviserFilters::EFFICIENCY] = 1;
+    weights[OpenMagnetics::CoreAdviser::CoreAdviserFilters::DIMENSIONS] = 1;
+
+    auto settings = OpenMagnetics::Settings::GetInstance();
+    settings->set_use_only_cores_in_stock(useOnlyCoresInStock);
+
+    OpenMagnetics::CoreAdviser coreAdviser(false);
+    auto masMagnetics = coreAdviser.get_advised_core(inputs, weights, maximumNumberResults);
+
+    json results = json::array();
+    for (auto& masMagnetic : masMagnetics) {
+        json aux;
+        to_json(aux, masMagnetic.first);
+        results.push_back(aux);
+    }
+    settings->reset();
+
+    return results.dump(4);
+}
+
+std::string MKFNet::CalculateAdvisedMagnetics(std::string inputsString, int maximumNumberResults){
+    OpenMagnetics::InputsWrapper inputs(json::parse(inputsString));
+
+    OpenMagnetics::MagneticAdviser magneticAdviser;
+    auto masMagnetics = magneticAdviser.get_advised_magnetic(inputs, maximumNumberResults);
+
+    json results = json::array();
+    for (auto& masMagnetic : masMagnetics) {
+        json aux;
+        to_json(aux, masMagnetic);
+        results.push_back(aux);
+    }
+
+    return results.dump(4);
+}
+
+std::string MKFNet::CalculateWindingLosses(std::string magneticString, std::string operatingPointString, double temperature) {
+    OpenMagnetics::MagneticWrapper magnetic(json::parse(magneticString));
+    OpenMagnetics::OperatingPoint operatingPoint(json::parse(operatingPointString));
+
+    auto windingLossesOutput = OpenMagnetics::WindingLosses().calculate_losses(magnetic, operatingPoint, temperature);
+
+    json result;
+    to_json(result, windingLossesOutput);
+
+    return result.dump(4);
+}
+
+bool MKFNet::PlotCore(std::string magneticString, std::string outFile) {
+    try {
+        OpenMagnetics::MagneticWrapper magnetic(json::parse(magneticString));
+        OpenMagnetics::Painter painter(outFile);
+        painter.paint_core(magnetic);
+        painter.paint_bobbin(magnetic);
+        painter.export_svg();
+        return true;
+    }
+    catch (...) {
+        return false;
+    }
+}
+
+bool MKFNet::PlotSections(std::string magneticString, std::string outFile) {
+    try {
+        OpenMagnetics::MagneticWrapper magnetic(json::parse(magneticString));
+        OpenMagnetics::Painter painter(outFile);
+        painter.paint_core(magnetic);
+        painter.paint_bobbin(magnetic);
+        painter.paint_coil_sections(magnetic);
+        painter.export_svg();
+        return true;
+    }
+    catch (...) {
+        return false;
+    }
+}
+
+bool MKFNet::PlotLayers(std::string magneticString, std::string outFile) {
+    try {
+        OpenMagnetics::MagneticWrapper magnetic(json::parse(magneticString));
+        OpenMagnetics::Painter painter(outFile);
+        painter.paint_core(magnetic);
+        painter.paint_bobbin(magnetic);
+        painter.paint_coil_layers(magnetic);
+        painter.export_svg();
+        return true;
+    }
+    catch (...) {
+        return false;
+    }
+}
+
+bool MKFNet::PlotTurns(std::string magneticString, std::string outFile) {
+    try {
+        OpenMagnetics::MagneticWrapper magnetic(json::parse(magneticString));
+        OpenMagnetics::Painter painter(outFile);
+        painter.paint_core(magnetic);
+        painter.paint_bobbin(magnetic);
+        painter.paint_coil_turns(magnetic);
+        painter.export_svg();
+        return true;
+    }
+    catch (...) {
+        return false;
+    }
+}
+
+bool MKFNet::PlotField(std::string magneticString, std::string operatingPointString, std::string outFile) {
+    try {
+        auto settings = OpenMagnetics::Settings::GetInstance();
+        OpenMagnetics::MagneticWrapper magnetic(json::parse(magneticString));
+        OpenMagnetics::OperatingPoint operatingPoint(json::parse(operatingPointString));
+        OpenMagnetics::Painter painter(outFile);
+        painter.paint_magnetic_field(operatingPoint, magnetic);
+        painter.paint_core(magnetic);
+        painter.paint_bobbin(magnetic);
+        painter.paint_coil_turns(magnetic);
+        painter.export_svg();
+        return true;
+    }
+    catch (...) {
+        return false;
+    }
+}
+
+std::string MKFNet::GetSettings() {
+    auto settings = OpenMagnetics::Settings::GetInstance();
+    json settingsJson;
+    settingsJson["coilAllowMarginTape"] = settings->get_coil_allow_margin_tape();
+    settingsJson["coilAllowInsulatedWire"] = settings->get_coil_allow_insulated_wire();
+    settingsJson["coilFillSectionsWithMarginTape"] = settings->get_coil_fill_sections_with_margin_tape();
+    settingsJson["coilWindEvenIfNotFit"] = settings->get_coil_wind_even_if_not_fit();
+    settingsJson["coilDelimitAndCompact"] = settings->get_coil_delimit_and_compact();
+    settingsJson["coilTryRewind"] = settings->get_coil_try_rewind();
+    settingsJson["useOnlyCoresInStock"] = settings->get_use_only_cores_in_stock();
+    settingsJson["painterNumberPointsX"] = settings->get_painter_number_points_x();
+    settingsJson["painterNumberPointsY"] = settings->get_painter_number_points_y();
+    settingsJson["painterMode"] = settings->get_painter_mode();
+    settingsJson["painterLogarithmicScale"] = settings->get_painter_logarithmic_scale();
+    settingsJson["painterIncludeFringing"] = settings->get_painter_include_fringing();
+    settingsJson["painterMaximumValueColorbar"] = settings->get_painter_maximum_value_colorbar();
+    settingsJson["painterMinimumValueColorbar"] = settings->get_painter_minimum_value_colorbar();
+    settingsJson["painterColorFerrite"] = settings->get_painter_color_ferrite();
+    settingsJson["painterColorBobbin"] = settings->get_painter_color_bobbin();
+    settingsJson["painterColorCopper"] = settings->get_painter_color_copper();
+    settingsJson["painterColorInsulation"] = settings->get_painter_color_insulation();
+    settingsJson["painterColorMargin"] = settings->get_painter_color_margin();
+    settingsJson["painterMirroringDimension"] = settings->get_painter_mirroring_dimension();
+    settingsJson["magneticFieldNumberPointsX"] = settings->get_magnetic_field_number_points_x();
+    settingsJson["magneticFieldNumberPointsY"] = settings->get_magnetic_field_number_points_y();
+    settingsJson["magneticFieldIncludeFringing"] = settings->get_magnetic_field_include_fringing();
+    settingsJson["magneticFieldMirroringDimension"] = settings->get_magnetic_field_mirroring_dimension();
+    return settingsJson.dump(4);
+}
+
+void MKFNet::SetSettings(std::string settingsString) {
+    auto settings = OpenMagnetics::Settings::GetInstance();
+    json settingsJson = json::parse(settingsString);
+    settings->set_coil_allow_margin_tape(settingsJson["coilAllowMarginTape"]);
+    settings->set_coil_allow_insulated_wire(settingsJson["coilAllowInsulatedWire"]);
+    settings->set_coil_fill_sections_with_margin_tape(settingsJson["coilFillSectionsWithMarginTape"]);
+    settings->set_coil_wind_even_if_not_fit(settingsJson["coilWindEvenIfNotFit"]);
+    settings->set_coil_delimit_and_compact(settingsJson["coilDelimitAndCompact"]);
+    settings->set_coil_try_rewind(settingsJson["coilTryRewind"]);
+    settings->set_use_only_cores_in_stock(settingsJson["useOnlyCoresInStock"]);
+    settings->set_painter_number_points_x(settingsJson["painterNumberPointsX"]);
+    settings->set_painter_number_points_y(settingsJson["painterNumberPointsY"]);
+    settings->set_painter_mode(settingsJson["painterMode"]);
+    settings->set_painter_logarithmic_scale(settingsJson["painterLogarithmicScale"]);
+    settings->set_painter_include_fringing(settingsJson["painterIncludeFringing"]);
+    settings->set_painter_maximum_value_colorbar(settingsJson["painterMaximumValueColorbar"]);
+    settings->set_painter_minimum_value_colorbar(settingsJson["painterMinimumValueColorbar"]);
+    settings->set_painter_color_ferrite(settingsJson["painterColorFerrite"]);
+    settings->set_painter_color_bobbin(settingsJson["painterColorBobbin"]);
+    settings->set_painter_color_copper(settingsJson["painterColorCopper"]);
+    settings->set_painter_color_insulation(settingsJson["painterColorInsulation"]);
+    settings->set_painter_color_margin(settingsJson["painterColorMargin"]);
+    settings->set_painter_mirroring_dimension(settingsJson["painterMirroringDimension"]);
+    settings->set_magnetic_field_number_points_x(settingsJson["magneticFieldNumberPointsX"]);
+    settings->set_magnetic_field_number_points_y(settingsJson["magneticFieldNumberPointsY"]);
+    settings->set_magnetic_field_include_fringing(settingsJson["magneticFieldIncludeFringing"]);
+    settings->set_magnetic_field_mirroring_dimension(settingsJson["magneticFieldMirroringDimension"]);
+}
+
+void MKFNet::ResetSettings() {
+    auto settings = OpenMagnetics::Settings::GetInstance();
+    settings->reset();
 }
