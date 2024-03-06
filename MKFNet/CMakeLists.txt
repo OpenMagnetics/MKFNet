@@ -124,7 +124,8 @@ find_package(SWIG REQUIRED)
 include(${SWIG_USE_FILE})
 
 # Set .Net project directory
-set(NET_PROJECT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../MKFNetTest")
+# set(NET_PROJECT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../MKFNetTest")
+set(NET_PROJECT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../MMM/src/MMM")
 
 # Add swig flags here
 set(CMAKE_SWIG_FLAGS "")

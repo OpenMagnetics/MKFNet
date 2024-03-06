@@ -26,7 +26,187 @@
 MKFNet::MKFNet(){
 }
 
-std::string MKFNet::GetMaterial(std::string materialName) {
+void MKFNet::LoadDatabases(std::string databasesString) {
+    json databasesJson = json::parse(databasesString);
+    OpenMagnetics::load_databases(databasesJson, true);
+}
+
+std::string MKFNet::GetCoreMaterials() {
+    try {
+        auto materials = OpenMagnetics::get_materials(std::nullopt);
+        json result = json::array();
+        for (auto elem: materials) {
+            json aux;
+            OpenMagnetics::to_json(aux, elem);
+            result.push_back(aux);
+        }
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+std::string MKFNet::GetCoreShapes() {
+    try {
+        auto shapes = OpenMagnetics::get_shapes(true);
+        json result = json::array();
+        for (auto elem : shapes) {
+            json aux;
+            OpenMagnetics::to_json(aux, elem);
+            result.push_back(aux);
+        }
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+std::string MKFNet::GetWires() {
+    try {
+        auto wires = OpenMagnetics::get_wires();
+        json result = json::array();
+        for (auto elem : wires) {
+            json aux;
+            OpenMagnetics::to_json(aux, elem);
+            result.push_back(aux);
+        }
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+std::string MKFNet::GetBobbins() {
+    try {
+        auto bobbins = OpenMagnetics::get_bobbins();
+        json result = json::array();
+        for (auto elem : bobbins) {
+            json aux;
+            OpenMagnetics::to_json(aux, elem);
+            result.push_back(aux);
+        }
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+std::string MKFNet::GetInsulationMaterials() {
+    try {
+        auto insulationMaterials = OpenMagnetics::get_insulation_materials();
+        json result = json::array();
+        for (auto elem : insulationMaterials) {
+            json aux;
+            OpenMagnetics::to_json(aux, elem);
+            result.push_back(aux);
+        }
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+std::string MKFNet::GetWireMaterials() {
+    try {
+        auto wireMaterials = OpenMagnetics::get_wire_materials();
+        json result = json::array();
+        for (auto elem : wireMaterials) {
+            json aux;
+            OpenMagnetics::to_json(aux, elem);
+            result.push_back(aux);
+        }
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+
+std::string MKFNet::GetCoreMaterialNames() {
+    try {
+        auto materialNames = OpenMagnetics::get_material_names(std::nullopt);
+        json result = json::array();
+        for (auto elem : materialNames) {
+            result.push_back(elem);
+        }
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+
+std::string MKFNet::GetCoreShapeNames() {
+    try {
+        auto shapeNames = OpenMagnetics::get_shape_names(true);
+        json result = json::array();
+        for (auto elem : shapeNames) {
+            result.push_back(elem);
+        }
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+
+std::string MKFNet::GetWireNames() {
+    try {
+        auto wireNames = OpenMagnetics::get_wire_names();
+        json result = json::array();
+        for (auto elem : wireNames) {
+            result.push_back(elem);
+        }
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+
+std::string MKFNet::GetBobbinNames() {
+    try {
+        auto bobbinNames = OpenMagnetics::get_bobbin_names();
+        json result = json::array();
+        for (auto elem : bobbinNames) {
+            result.push_back(elem);
+        }
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+
+std::string MKFNet::GetInsulationMaterialNames() {
+    try {
+        auto insulationMaterialNames = OpenMagnetics::get_insulation_material_names();
+        json result = json::array();
+        for (auto elem : insulationMaterialNames) {
+            result.push_back(elem);
+        }
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+
+std::string MKFNet::GetWireMaterialNames() {
+    try {
+        auto wireMaterialNames = OpenMagnetics::get_wire_material_names();
+        json result = json::array();
+        for (auto elem : wireMaterialNames) {
+            result.push_back(elem);
+        }
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+
+std::string MKFNet::FindCoreMaterialByName(std::string materialName) {
     try {
         auto materialData = OpenMagnetics::find_core_material_by_name(materialName);
         json result;
@@ -38,11 +218,59 @@ std::string MKFNet::GetMaterial(std::string materialName) {
     }
 }
 
-std::string MKFNet::GetShape(std::string shapeName) {
+std::string MKFNet::FindCoreShapeByName(std::string shapeName) {
     try {
         auto shapeData = OpenMagnetics::find_core_shape_by_name(shapeName);
         json result;
         to_json(result, shapeData);
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+
+std::string MKFNet::FindWireByName(std::string wireName) {
+    try {
+        auto wireData = OpenMagnetics::find_wire_by_name(wireName);
+        json result;
+        to_json(result, wireData);
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+
+std::string MKFNet::FindBobbinByName(std::string bobbinName) {
+    try {
+        auto bobbinData = OpenMagnetics::find_bobbin_by_name(bobbinName);
+        json result;
+        to_json(result, bobbinData);
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+
+std::string MKFNet::FindInsulationMaterialByName(std::string insulationMaterialName) {
+    try {
+        auto insulationMaterialData = OpenMagnetics::find_insulation_material_by_name(insulationMaterialName);
+        json result;
+        to_json(result, insulationMaterialData);
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+
+std::string MKFNet::FindWireMaterialByName(std::string wireMaterialName) {
+    try {
+        auto wireMaterialData = OpenMagnetics::find_wire_material_by_name(wireMaterialName);
+        json result;
+        to_json(result, wireMaterialData);
         return result.dump(4);
     }
     catch (const std::exception &exc) {
@@ -117,6 +345,7 @@ std::string MKFNet::Wind(std::string coilString, size_t repetitions, std::string
         std::vector<size_t> pattern = json::parse(patternString);
         auto coilFunctionalDescription = std::vector<OpenMagnetics::CoilFunctionalDescription>(coilJson["functionalDescription"]);
         OpenMagnetics::CoilWrapper coil;
+
         if (coilJson.contains("_interleavingLevel")) {
             coil.set_interleaving_level(coilJson["_interleavingLevel"]);
         }
@@ -157,6 +386,186 @@ std::string MKFNet::Wind(std::string coilString, size_t repetitions, std::string
                 coil.wind();
             }
         }
+
+        json result;
+        to_json(result, coil);
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+
+std::string MKFNet::WindBySections(std::string coilString, size_t repetitions, std::string proportionPerWindingString, std::string patternString) {
+    try {
+        auto coilJson = json::parse(coilString);
+
+        std::vector<double> proportionPerWinding = json::parse(proportionPerWindingString);
+        std::vector<size_t> pattern = json::parse(patternString);
+        auto coilFunctionalDescription = std::vector<OpenMagnetics::CoilFunctionalDescription>(coilJson["functionalDescription"]);
+        OpenMagnetics::CoilWrapper coil;
+
+        if (coilJson.contains("_interleavingLevel")) {
+            coil.set_interleaving_level(coilJson["_interleavingLevel"]);
+        }
+        if (coilJson.contains("_windingOrientation")) {
+            coil.set_winding_orientation(coilJson["_windingOrientation"]);
+        }
+        if (coilJson.contains("_layersOrientation")) {
+            coil.set_layers_orientation(coilJson["_layersOrientation"]);
+        }
+        if (coilJson.contains("_turnsAlignment")) {
+            coil.set_turns_alignment(coilJson["_turnsAlignment"]);
+        }
+        if (coilJson.contains("_sectionAlignment")) {
+            coil.set_section_alignment(coilJson["_sectionAlignment"]);
+        }
+
+        coil.set_bobbin(coilJson["bobbin"]);
+        coil.set_functional_description(coilFunctionalDescription);
+        if (proportionPerWinding.size() == coilFunctionalDescription.size()) {
+            if (pattern.size() > 0 && repetitions > 0) {
+                coil.wind_by_sections(proportionPerWinding, pattern, repetitions);
+            }
+            else if (repetitions > 0) {
+                coil.wind_by_sections(repetitions);
+            }
+            else {
+                coil.wind_by_sections();
+            }
+        }
+        else {
+            if (pattern.size() > 0 && repetitions > 0) {
+                coil.wind_by_sections(pattern, repetitions);
+            }
+            else if (repetitions > 0) {
+                coil.wind_by_sections(repetitions);
+            }
+            else {
+                coil.wind_by_sections();
+            }
+        }
+
+        json result;
+        to_json(result, coil);
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+
+std::string MKFNet::WindByLayers(std::string coilString) {
+    try {
+        auto coilJson = json::parse(coilString);
+
+        auto coilFunctionalDescription = std::vector<OpenMagnetics::CoilFunctionalDescription>(coilJson["functionalDescription"]);
+        auto coilSectionsDescription = std::vector<OpenMagnetics::Section>(coilJson["sectionsDescription"]);
+        OpenMagnetics::CoilWrapper coil;
+
+        if (coilJson.contains("_interleavingLevel")) {
+            coil.set_interleaving_level(coilJson["_interleavingLevel"]);
+        }
+        if (coilJson.contains("_windingOrientation")) {
+            coil.set_winding_orientation(coilJson["_windingOrientation"]);
+        }
+        if (coilJson.contains("_layersOrientation")) {
+            coil.set_layers_orientation(coilJson["_layersOrientation"]);
+        }
+        if (coilJson.contains("_turnsAlignment")) {
+            coil.set_turns_alignment(coilJson["_turnsAlignment"]);
+        }
+        if (coilJson.contains("_sectionAlignment")) {
+            coil.set_section_alignment(coilJson["_sectionAlignment"]);
+        }
+
+        coil.set_bobbin(coilJson["bobbin"]);
+        coil.set_functional_description(coilFunctionalDescription);
+        coil.set_sections_description(coilSectionsDescription);
+        coil.wind_by_layers();
+
+        json result;
+        to_json(result, coil);
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+
+std::string MKFNet::WindByTurns(std::string coilString) {
+    try {
+        auto coilJson = json::parse(coilString);
+
+        auto coilFunctionalDescription = std::vector<OpenMagnetics::CoilFunctionalDescription>(coilJson["functionalDescription"]);
+        auto coilSectionsDescription = std::vector<OpenMagnetics::Section>(coilJson["sectionsDescription"]);
+        auto coilLayersDescription = std::vector<OpenMagnetics::Layer>(coilJson["layersDescription"]);
+        OpenMagnetics::CoilWrapper coil;
+
+        if (coilJson.contains("_interleavingLevel")) {
+            coil.set_interleaving_level(coilJson["_interleavingLevel"]);
+        }
+        if (coilJson.contains("_windingOrientation")) {
+            coil.set_winding_orientation(coilJson["_windingOrientation"]);
+        }
+        if (coilJson.contains("_layersOrientation")) {
+            coil.set_layers_orientation(coilJson["_layersOrientation"]);
+        }
+        if (coilJson.contains("_turnsAlignment")) {
+            coil.set_turns_alignment(coilJson["_turnsAlignment"]);
+        }
+        if (coilJson.contains("_sectionAlignment")) {
+            coil.set_section_alignment(coilJson["_sectionAlignment"]);
+        }
+
+        coil.set_bobbin(coilJson["bobbin"]);
+        coil.set_functional_description(coilFunctionalDescription);
+        coil.set_sections_description(coilSectionsDescription);
+        coil.set_layers_description(coilLayersDescription);
+        coil.wind_by_turns();
+
+        json result;
+        to_json(result, coil);
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+
+
+std::string MKFNet::DelimitAndCompact(std::string coilString) {
+    try {
+        auto coilJson = json::parse(coilString);
+
+        auto coilFunctionalDescription = std::vector<OpenMagnetics::CoilFunctionalDescription>(coilJson["functionalDescription"]);
+        auto coilSectionsDescription = std::vector<OpenMagnetics::Section>(coilJson["sectionsDescription"]);
+        auto coilLayersDescription = std::vector<OpenMagnetics::Layer>(coilJson["layersDescription"]);
+        auto coilTurnsDescription = std::vector<OpenMagnetics::Turn>(coilJson["turnsDescription"]);
+        OpenMagnetics::CoilWrapper coil;
+
+        if (coilJson.contains("_interleavingLevel")) {
+            coil.set_interleaving_level(coilJson["_interleavingLevel"]);
+        }
+        if (coilJson.contains("_windingOrientation")) {
+            coil.set_winding_orientation(coilJson["_windingOrientation"]);
+        }
+        if (coilJson.contains("_layersOrientation")) {
+            coil.set_layers_orientation(coilJson["_layersOrientation"]);
+        }
+        if (coilJson.contains("_turnsAlignment")) {
+            coil.set_turns_alignment(coilJson["_turnsAlignment"]);
+        }
+        if (coilJson.contains("_sectionAlignment")) {
+            coil.set_section_alignment(coilJson["_sectionAlignment"]);
+        }
+
+        coil.set_bobbin(coilJson["bobbin"]);
+        coil.set_functional_description(coilFunctionalDescription);
+        coil.set_sections_description(coilSectionsDescription);
+        coil.set_layers_description(coilLayersDescription);
+        coil.set_turns_description(coilTurnsDescription);
+        coil.delimit_and_compact();
 
         json result;
         to_json(result, coil);
@@ -294,7 +703,7 @@ std::string MKFNet::CalculateAdvisedMagnetics(std::string inputsString, int maxi
         auto masMagnetics = magneticAdviser.get_advised_magnetic(inputs, maximumNumberResults);
 
         json results = json::array();
-        for (auto& masMagnetic : masMagnetics) {
+        for (auto& [masMagnetic, scoring] : masMagnetics) {
             json aux;
             to_json(aux, masMagnetic);
             results.push_back(aux);
@@ -402,6 +811,134 @@ std::string MKFNet::CalculateSkinEffectLossesPerMeter(std::string wireString, st
         return "Exception: " + std::string{exc.what()};
     }
 }
+
+double MKFNet::GetOuterDiameterEnameledRound(double conductingDiameter, int grade, std::string standardString) {
+    try {
+        OpenMagnetics::WireStandard standard;
+        if (bool(magic_enum::enum_cast<OpenMagnetics::WireStandard>(standardString))) {
+            standard = magic_enum::enum_cast<OpenMagnetics::WireStandard>(standardString).value();
+        }
+        else {
+            from_json(standardString, standard);
+        }
+
+        auto outerDiameter = OpenMagnetics::WireWrapper::get_outer_diameter_round(conductingDiameter, grade, standard);
+
+        return outerDiameter;
+    }
+    catch (const std::exception &exc) {
+        return -1;
+    }
+}
+double MKFNet::GetOuterDiameterInsulatedRound(double conductingDiameter, int numberLayers, double thicknessLayers, std::string standardString){
+    try {
+        OpenMagnetics::WireStandard standard;
+        if (bool(magic_enum::enum_cast<OpenMagnetics::WireStandard>(standardString))) {
+            standard = magic_enum::enum_cast<OpenMagnetics::WireStandard>(standardString).value();
+        }
+        else {
+            from_json(standardString, standard);
+        }
+
+        auto outerDiameter = OpenMagnetics::WireWrapper::get_outer_diameter_round(conductingDiameter, numberLayers, thicknessLayers, standard);
+
+        return outerDiameter;
+    }
+    catch (const std::exception &exc) {
+        return -1;
+    }
+}
+double MKFNet::GetOuterDiameterServedLitz(double conductingDiameter, int numberConductors, int grade, int numberLayers, std::string standardString){
+    try {
+        OpenMagnetics::WireStandard standard;
+        if (bool(magic_enum::enum_cast<OpenMagnetics::WireStandard>(standardString))) {
+            standard = magic_enum::enum_cast<OpenMagnetics::WireStandard>(standardString).value();
+        }
+        else {
+            from_json(standardString, standard);
+        }
+
+        auto outerDiameter = OpenMagnetics::WireWrapper::get_outer_diameter_served_litz(conductingDiameter, numberConductors, grade, numberLayers, standard);
+
+        return outerDiameter;
+    }
+    catch (const std::exception &exc) {
+        return -1;
+    }
+}
+double MKFNet::GetOuterDiameterInsulatedLitz(double conductingDiameter, int numberConductors, int numberLayers, double thicknessLayers, int grade, std::string standardString){
+    try {
+        OpenMagnetics::WireStandard standard;
+        if (bool(magic_enum::enum_cast<OpenMagnetics::WireStandard>(standardString))) {
+            standard = magic_enum::enum_cast<OpenMagnetics::WireStandard>(standardString).value();
+        }
+        else {
+            from_json(standardString, standard);
+        }
+
+        auto outerDiameter = OpenMagnetics::WireWrapper::get_outer_diameter_insulated_litz(conductingDiameter, numberConductors, numberLayers, thicknessLayers, grade, standard);
+
+        return outerDiameter;
+    }
+    catch (const std::exception &exc) {
+        return -1;
+    }
+}
+double MKFNet::GetConductingAreaRectangular(double conductingWidth, double conductingHeight, std::string standardString){
+    try {
+        OpenMagnetics::WireStandard standard;
+        if (bool(magic_enum::enum_cast<OpenMagnetics::WireStandard>(standardString))) {
+            standard = magic_enum::enum_cast<OpenMagnetics::WireStandard>(standardString).value();
+        }
+        else {
+            from_json(standardString, standard);
+        }
+
+        auto outerDiameter = OpenMagnetics::WireWrapper::get_conducting_area_rectangular(conductingWidth, conductingHeight, standard);
+
+        return outerDiameter;
+    }
+    catch (const std::exception &exc) {
+        return -1;
+    }
+}
+double MKFNet::GetOuterWidthRectangular(double conductingWidth, int grade, std::string standardString){
+    try {
+        OpenMagnetics::WireStandard standard;
+        if (bool(magic_enum::enum_cast<OpenMagnetics::WireStandard>(standardString))) {
+            standard = magic_enum::enum_cast<OpenMagnetics::WireStandard>(standardString).value();
+        }
+        else {
+            from_json(standardString, standard);
+        }
+
+        auto outerDiameter = OpenMagnetics::WireWrapper::get_outer_width_rectangular(conductingWidth, grade, standard);
+
+        return outerDiameter;
+    }
+    catch (const std::exception &exc) {
+        return -1;
+    }
+}
+double MKFNet::GetOuterHeightRectangular(double conductingHeight, int grade, std::string standardString){
+    try {
+        OpenMagnetics::WireStandard standard;
+        if (bool(magic_enum::enum_cast<OpenMagnetics::WireStandard>(standardString))) {
+            standard = magic_enum::enum_cast<OpenMagnetics::WireStandard>(standardString).value();
+        }
+        else {
+            from_json(standardString, standard);
+        }
+
+        auto outerDiameter = OpenMagnetics::WireWrapper::get_outer_height_rectangular(conductingHeight, grade, standard);
+
+        return outerDiameter;
+    }
+    catch (const std::exception &exc) {
+        return -1;
+    }
+}
+
 
 bool MKFNet::PlotCore(std::string magneticString, std::string outFile) {
     try {
