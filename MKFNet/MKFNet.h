@@ -55,6 +55,9 @@ public:
     double GetOuterWidthRectangular(double conductingWidth, int grade = 1, std::string standardString = "IEC_60317");
     double GetOuterHeightRectangular(double conductingHeight, int grade = 1, std::string standardString = "IEC_60317");
 
+    double CalculateCoreMaximumMagneticEnergy(std::string coreDataString, std::string operatingPointString);
+    double CalculateRequiredMagneticEnergy(std::string inputsString);
+
     bool PlotField(std::string magneticString, std::string operatingPointString, std::string outFile);
     bool PlotCore(std::string magneticString, std::string outFile);
     bool PlotSections(std::string magneticString, std::string outFile);

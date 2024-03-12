@@ -10,6 +10,7 @@
 #include "MagneticWrapper.h"
 #include "Reluctance.h"
 #include "MagnetizingInductance.h"
+#include "MagneticEnergy.h"
 #include "MagneticAdviser.h"
 #include "MagneticField.h"
 #include "WindingSkinEffectLosses.h"
@@ -902,6 +903,7 @@ double MKFNet::GetConductingAreaRectangular(double conductingWidth, double condu
         return -1;
     }
 }
+
 double MKFNet::GetOuterWidthRectangular(double conductingWidth, int grade, std::string standardString){
     try {
         OpenMagnetics::WireStandard standard;
@@ -920,6 +922,7 @@ double MKFNet::GetOuterWidthRectangular(double conductingWidth, int grade, std::
         return -1;
     }
 }
+
 double MKFNet::GetOuterHeightRectangular(double conductingHeight, int grade, std::string standardString){
     try {
         OpenMagnetics::WireStandard standard;
@@ -939,6 +942,32 @@ double MKFNet::GetOuterHeightRectangular(double conductingHeight, int grade, std
     }
 }
 
+double MKFNet::CalculateCoreMaximumMagneticEnergy(std::string coreDataString, std::string operatingPointString){
+    try {
+        OpenMagnetics::CoreWrapper core(json::parse(coreDataString), false, false, false);
+        OpenMagnetics::OperatingPoint operatingPoint(json::parse(operatingPointString));
+        auto magneticEnergy = OpenMagnetics::MagneticEnergy({});
+        auto coreMaximumMagneticEnergy = magneticEnergy.get_core_maximum_magnetic_energy(core, &operatingPoint);
+        return coreMaximumMagneticEnergy;
+    }
+    catch (const std::exception &exc) {
+        std::cout << "Exception: " + std::string{exc.what()} << std::endl;
+        return false;
+    }
+}
+
+double MKFNet::CalculateRequiredMagneticEnergy(std::string inputsString){
+    try {
+        OpenMagnetics::InputsWrapper inputs(json::parse(inputsString));
+        auto magneticEnergy = OpenMagnetics::MagneticEnergy({});
+        auto requiredMagneticEnergy = magneticEnergy.required_magnetic_energy(inputs);
+        return OpenMagnetics::resolve_dimensional_values(requiredMagneticEnergy);
+    }
+    catch (const std::exception &exc) {
+        std::cout << "Exception: " + std::string{exc.what()} << std::endl;
+        return false;
+    }
+}
 
 bool MKFNet::PlotCore(std::string magneticString, std::string outFile) {
     try {
