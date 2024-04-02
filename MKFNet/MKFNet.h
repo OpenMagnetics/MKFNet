@@ -4,6 +4,10 @@ public:
     MKFNet();
 
     void LoadDatabases(std::string databasesString);
+    std::string LoadMas(std::string key, std::string masString, bool expand);
+    std::string LoadMagnetic(std::string key, std::string magneticString, std::string inputsString, bool expand);
+    std::string ReadMas(std::string key);
+    std::string ReadDatabases(std::string path, bool addInternalData);
 
     std::string FindCoreMaterialByName(std::string materialName);
     std::string FindCoreShapeByName(std::string shapeName);

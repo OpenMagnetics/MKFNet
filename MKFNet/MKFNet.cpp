@@ -4,15 +4,16 @@
 #include "Insulation.h"
 #include "Defaults.h"
 #include <MAS.hpp>
-#include "MagneticSimulator.h"
 #include "InputsWrapper.h"
 #include "CoreWrapper.h"
-#include "MagneticWrapper.h"
 #include "Reluctance.h"
 #include "MagnetizingInductance.h"
 #include "MagneticEnergy.h"
 #include "MagneticAdviser.h"
 #include "MagneticField.h"
+#include "MagneticSimulator.h"
+#include "MagneticWrapper.h"
+#include "MasWrapper.h"
 #include "WindingSkinEffectLosses.h"
 #include "WindingProximityEffectLosses.h"
 #include "WindingOhmicLosses.h"
@@ -27,9 +28,219 @@
 MKFNet::MKFNet(){
 }
 
+std::map<std::string, OpenMagnetics::MasWrapper> masDatabase;
+
 void MKFNet::LoadDatabases(std::string databasesString) {
     json databasesJson = json::parse(databasesString);
     OpenMagnetics::load_databases(databasesJson, true);
+}
+
+std::string MKFNet::ReadDatabases(std::string path, bool addInternalData) {
+    try {
+        auto masPath = std::filesystem::path{path};
+        json data;
+        std::string line;
+        {
+            data["coreMaterials"] = json();
+            std::ifstream coreMaterials(masPath.append("core_materials.ndjson"));
+            std::cout << masPath.append("core_materials.ndjson") << std::endl;
+            while (getline (coreMaterials, line)) {
+                json jf = json::parse(line);
+                data["coreMaterials"][jf["name"]] = jf;
+            }
+        }
+        {
+            data["coreShapes"] = json();
+            std::ifstream coreMaterials(masPath.append("core_shapes.ndjson"));
+            while (getline (coreMaterials, line)) {
+                json jf = json::parse(line);
+                data["coreShapes"][jf["name"]] = jf;
+            }
+        }
+        {
+            data["wires"] = json();
+            std::ifstream coreMaterials(masPath.append("wires.ndjson"));
+            while (getline (coreMaterials, line)) {
+                json jf = json::parse(line);
+                data["wires"][jf["name"]] = jf;
+            }
+        }
+        {
+            data["bobbins"] = json();
+            std::ifstream coreMaterials(masPath.append("bobbins.ndjson"));
+            while (getline (coreMaterials, line)) {
+                json jf = json::parse(line);
+                data["bobbins"][jf["name"]] = jf;
+            }
+        }
+        {
+            data["insulationMaterials"] = json();
+            std::ifstream coreMaterials(masPath.append("insulation_materials.ndjson"));
+            while (getline (coreMaterials, line)) {
+                json jf = json::parse(line);
+                data["insulationMaterials"][jf["name"]] = jf;
+            }
+        }
+        {
+            data["wireMaterials"] = json();
+            std::ifstream coreMaterials(masPath.append("wire_materials.ndjson"));
+            while (getline (coreMaterials, line)) {
+                json jf = json::parse(line);
+                data["wireMaterials"][jf["name"]] = jf;
+            }
+        }
+        OpenMagnetics::load_databases(data, true, addInternalData);
+        return "0";
+    }
+    catch (const std::exception &exc) {
+        return std::string{exc.what()};
+    }
+}
+
+OpenMagnetics::MagneticWrapper expandMagnetic(OpenMagnetics::MagneticWrapper magnetic) {
+    magnetic.get_mutable_core().get_mutable_functional_description().set_material(magnetic.get_mutable_core().get_material());
+
+    if (magnetic.get_coil().get_sections_description() && !magnetic.get_coil().get_turns_description()){
+        if (!magnetic.get_core().get_processed_description()) {
+            magnetic.get_mutable_core().process_data();
+        }
+
+        if (magnetic.get_core().get_functional_description().get_gapping().size() > 0 && !magnetic.get_core().get_functional_description().get_gapping()[0].get_area()) {
+            magnetic.get_mutable_core().process_gap();
+        }
+        for (size_t windingIndex = 0; windingIndex < magnetic.get_coil().get_functional_description().size(); windingIndex++) {
+            magnetic.get_mutable_coil().resolve_wire(windingIndex);
+        }
+        for (size_t windingIndex = 0; windingIndex < magnetic.get_coil().get_functional_description().size(); windingIndex++)
+        {
+            auto wire = magnetic.get_mutable_coil().get_wires()[windingIndex];
+            if (wire.get_type() == OpenMagnetics::WireType::FOIL) {
+                if (!wire.get_conducting_height())
+                {
+                    auto bobbin = magnetic.get_mutable_coil().resolve_bobbin();
+                    OpenMagnetics::DimensionWithTolerance aux;
+                    aux.set_nominal(bobbin.get_processed_description()->get_winding_windows()[0].get_height().value() * 0.8);
+                    wire.set_conducting_height(aux);
+                }
+                if (!wire.get_outer_height())
+                {
+                    wire.set_outer_height(wire.get_conducting_height().value());
+                }
+                if (!wire.get_outer_width())
+                {
+                    wire.set_outer_width(wire.get_conducting_width().value());
+                }
+            }
+            if (wire.get_type() == OpenMagnetics::WireType::RECTANGULAR) {
+                if (!wire.get_outer_height())
+                {
+                    OpenMagnetics::DimensionWithTolerance aux;
+                    aux.set_nominal(OpenMagnetics::WireWrapper::get_outer_height_rectangular(OpenMagnetics::resolve_dimensional_values(wire.get_conducting_height().value())));
+                    wire.set_outer_height(aux);
+                }
+                if (!wire.get_outer_width())
+                {
+                    OpenMagnetics::DimensionWithTolerance aux;
+                    aux.set_nominal(OpenMagnetics::WireWrapper::get_outer_height_rectangular(OpenMagnetics::resolve_dimensional_values(wire.get_conducting_width().value())));
+                    wire.set_outer_width(aux);
+                }
+            }
+            if (wire.get_type() == OpenMagnetics::WireType::ROUND) {
+                if (!wire.get_outer_diameter())
+                {
+                    auto coating = wire.resolve_coating();
+                    if (coating->get_type() == OpenMagnetics::InsulationWireCoatingType::ENAMELLED)
+                    {
+                        OpenMagnetics::DimensionWithTolerance aux;
+                        aux.set_nominal(OpenMagnetics::WireWrapper::get_outer_diameter_round(OpenMagnetics::resolve_dimensional_values(OpenMagnetics::resolve_dimensional_values(wire.get_conducting_diameter().value()))));
+                        wire.set_outer_diameter(aux);
+                    }
+                    
+                    if (coating->get_type() == OpenMagnetics::InsulationWireCoatingType::INSULATED)
+                    {
+                        int numberLayers = coating->get_number_layers().value();
+                        int thicknessLayers = coating->get_thickness_layers().value();
+                        OpenMagnetics::DimensionWithTolerance aux;
+                        aux.set_nominal(OpenMagnetics::WireWrapper::get_outer_diameter_round(OpenMagnetics::resolve_dimensional_values(wire.get_conducting_diameter().value()), numberLayers, thicknessLayers));
+                        wire.set_outer_diameter(aux);
+                    }
+                }
+            }
+            if (wire.get_type() == OpenMagnetics::WireType::LITZ) {
+                if (!wire.get_outer_diameter())
+                {
+                    auto coating = wire.resolve_coating();
+                    auto strand = wire.resolve_strand();
+                    if (coating->get_type() == OpenMagnetics::InsulationWireCoatingType::SERVED)
+                    {
+                        OpenMagnetics::DimensionWithTolerance aux;
+                        aux.set_nominal(OpenMagnetics::WireWrapper::get_outer_diameter_served_litz(OpenMagnetics::resolve_dimensional_values(strand.get_conducting_diameter()), wire.get_number_conductors().value()));
+                        wire.set_outer_diameter(aux);
+                    }
+                    
+                    if (coating->get_type() == OpenMagnetics::InsulationWireCoatingType::INSULATED)
+                    {
+                        int numberLayers = coating->get_number_layers().value();
+                        int thicknessLayers = coating->get_thickness_layers().value();
+                        OpenMagnetics::DimensionWithTolerance aux;
+                        aux.set_nominal(OpenMagnetics::WireWrapper::get_outer_diameter_insulated_litz(OpenMagnetics::resolve_dimensional_values(strand.get_conducting_diameter()), wire.get_number_conductors().value(), numberLayers, thicknessLayers));
+                    }
+                }
+            }
+            magnetic.get_mutable_coil().get_mutable_functional_description()[windingIndex].set_wire(wire);
+        }
+        if (!magnetic.get_coil().get_turns_description())
+        {
+            magnetic.get_mutable_coil().wind_by_layers();
+        }
+        if (!magnetic.get_coil().get_turns_description())
+        {
+            magnetic.get_mutable_coil().wind_by_turns();
+            magnetic.get_mutable_coil().delimit_and_compact();
+        }
+    }
+    return magnetic;
+}
+
+std::string MKFNet::LoadMas(std::string key, std::string masString, bool expand) {
+    try {
+        json masJson = json::parse(masString);
+        OpenMagnetics::MasWrapper mas(masJson);
+        if (expand) {
+            mas.get_mutable_magnetic() = expandMagnetic(mas.get_mutable_magnetic());
+        }
+        masDatabase[key] = mas;
+        return std::to_string(masDatabase.size());
+    }
+    catch (const std::exception &exc) {
+        // std::cout << std::string{exc.what()} << std::endl;
+        return std::string{exc.what()};
+    }
+}
+
+std::string MKFNet::LoadMagnetic(std::string key, std::string magneticString, std::string inputsString, bool expand) {
+    try {
+        OpenMagnetics::MagneticWrapper magnetic(json::parse(magneticString));
+        OpenMagnetics::InputsWrapper inputs(json::parse(inputsString));
+        if (expand) {
+            magnetic = expandMagnetic(magnetic);
+        }
+        OpenMagnetics::MasWrapper mas;
+        mas.set_magnetic(magnetic);
+        mas.set_inputs(inputs);
+        masDatabase[key] = mas;
+        return std::to_string(masDatabase.size());
+    }
+    catch (const std::exception &exc) {
+        // std::cout << std::string{exc.what()} << std::endl;
+        return std::string{exc.what()};
+    }
+}
+
+std::string MKFNet::ReadMas(std::string key) {
+    json result;
+    to_json(result, masDatabase[key]);
+    return result.dump(4);
 }
 
 std::string MKFNet::GetCoreMaterials() {
@@ -596,11 +807,28 @@ std::string MKFNet::GetDefaultModels() {
 
 std::string MKFNet::CalculateCoreLosses(std::string magneticString, std::string inputsString, std::string modelsString) {
     try {
-        OpenMagnetics::MagneticWrapper magnetic(json::parse(magneticString));
+
+        OpenMagnetics::MagneticWrapper magnetic;
+        OpenMagnetics::InputsWrapper inputs;
+        OpenMagnetics::OperatingPoint operatingPoint;
+        if (magneticString.starts_with("{")) {
+            magnetic = OpenMagnetics::MagneticWrapper(json::parse(magneticString));
+        }
+        else {
+            magnetic = masDatabase[magneticString].get_magnetic();
+        }
+        if (inputsString.starts_with("{")) {
+            inputs = OpenMagnetics::InputsWrapper(json::parse(inputsString));
+            operatingPoint = inputs.get_operating_point(0);
+        }
+        else {
+            size_t operatingPointIndex = stoi(inputsString);
+            inputs = masDatabase[magneticString].get_inputs();
+            operatingPoint = masDatabase[magneticString].get_inputs().get_operating_points()[operatingPointIndex];
+        }
+
         OpenMagnetics::CoreWrapper core = magnetic.get_core();
         OpenMagnetics::CoilWrapper coil = magnetic.get_coil();
-        OpenMagnetics::InputsWrapper inputs(json::parse(inputsString));
-        auto operatingPoint = inputs.get_operating_point(0);
         OpenMagnetics::OperatingPointExcitation excitation = operatingPoint.get_excitations_per_winding()[0];
         double magnetizingInductance = OpenMagnetics::resolve_dimensional_values(inputs.get_design_requirements().get_magnetizing_inductance());
         if (!excitation.get_current()) {
@@ -678,7 +906,7 @@ std::string MKFNet::CalculateAdvisedCores(std::string inputsString, std::string 
         auto settings = OpenMagnetics::Settings::GetInstance();
         settings->set_use_only_cores_in_stock(useOnlyCoresInStock);
 
-        OpenMagnetics::CoreAdviser coreAdviser(false);
+        OpenMagnetics::CoreAdviser coreAdviser;
         auto masMagnetics = coreAdviser.get_advised_core(inputs, weights, maximumNumberResults);
 
         json results = json::array();
@@ -719,8 +947,22 @@ std::string MKFNet::CalculateAdvisedMagnetics(std::string inputsString, int maxi
 
 std::string MKFNet::CalculateWindingLosses(std::string magneticString, std::string operatingPointString, double temperature) {
     try {
-        OpenMagnetics::MagneticWrapper magnetic(json::parse(magneticString));
-        OpenMagnetics::OperatingPoint operatingPoint(json::parse(operatingPointString));
+
+        OpenMagnetics::MagneticWrapper magnetic;
+        OpenMagnetics::OperatingPoint operatingPoint;
+        if (magneticString.starts_with("{")) {
+            magnetic = OpenMagnetics::MagneticWrapper(json::parse(magneticString));
+        }
+        else {
+            magnetic = masDatabase[magneticString].get_magnetic();
+        }
+        if (operatingPointString.starts_with("{")) {
+            operatingPoint = OpenMagnetics::OperatingPoint(json::parse(operatingPointString));
+        }
+        else {
+            size_t operatingPointIndex = stoi(operatingPointString);
+            operatingPoint = masDatabase[magneticString].get_inputs().get_operating_points()[operatingPointIndex];
+        }
 
         auto windingLossesOutput = OpenMagnetics::WindingLosses().calculate_losses(magnetic, operatingPoint, temperature);
 
@@ -944,10 +1186,23 @@ double MKFNet::GetOuterHeightRectangular(double conductingHeight, int grade, std
 
 double MKFNet::CalculateCoreMaximumMagneticEnergy(std::string coreDataString, std::string operatingPointString){
     try {
-        OpenMagnetics::CoreWrapper core(json::parse(coreDataString), false, false, false);
-        OpenMagnetics::OperatingPoint operatingPoint(json::parse(operatingPointString));
+        OpenMagnetics::CoreWrapper core;
+        OpenMagnetics::OperatingPoint operatingPoint;
+        if (coreDataString.starts_with("{")) {
+            core = OpenMagnetics::CoreWrapper(json::parse(coreDataString), false, false, false);
+        }
+        else {
+            core = masDatabase[coreDataString].get_magnetic().get_core();
+        }
+        if (operatingPointString.starts_with("{")) {
+            operatingPoint = OpenMagnetics::OperatingPoint(json::parse(operatingPointString));
+        }
+        else {
+            size_t operatingPointIndex = stoi(operatingPointString);
+            operatingPoint = masDatabase[coreDataString].get_inputs().get_operating_points()[operatingPointIndex];
+        }
         auto magneticEnergy = OpenMagnetics::MagneticEnergy({});
-        auto coreMaximumMagneticEnergy = magneticEnergy.get_core_maximum_magnetic_energy(core, &operatingPoint);
+        auto coreMaximumMagneticEnergy = magneticEnergy.calculate_core_maximum_magnetic_energy(core, &operatingPoint);
         return coreMaximumMagneticEnergy;
     }
     catch (const std::exception &exc) {
@@ -960,7 +1215,7 @@ double MKFNet::CalculateRequiredMagneticEnergy(std::string inputsString){
     try {
         OpenMagnetics::InputsWrapper inputs(json::parse(inputsString));
         auto magneticEnergy = OpenMagnetics::MagneticEnergy({});
-        auto requiredMagneticEnergy = magneticEnergy.required_magnetic_energy(inputs);
+        auto requiredMagneticEnergy = magneticEnergy.calculate_required_magnetic_energy(inputs);
         return OpenMagnetics::resolve_dimensional_values(requiredMagneticEnergy);
     }
     catch (const std::exception &exc) {
@@ -1086,36 +1341,41 @@ std::string MKFNet::GetSettings() {
 }
 
 void MKFNet::SetSettings(std::string settingsString) {
-    auto settings = OpenMagnetics::Settings::GetInstance();
-    json settingsJson = json::parse(settingsString);
-    settings->set_coil_allow_margin_tape(settingsJson["coilAllowMarginTape"]);
-    settings->set_coil_allow_insulated_wire(settingsJson["coilAllowInsulatedWire"]);
-    settings->set_coil_fill_sections_with_margin_tape(settingsJson["coilFillSectionsWithMarginTape"]);
-    settings->set_coil_wind_even_if_not_fit(settingsJson["coilWindEvenIfNotFit"]);
-    settings->set_coil_delimit_and_compact(settingsJson["coilDelimitAndCompact"]);
-    settings->set_coil_try_rewind(settingsJson["coilTryRewind"]);
-    settings->set_painter_mode(settingsJson["painterMode"]);
-    settings->set_use_only_cores_in_stock(settingsJson["useOnlyCoresInStock"]);
-    settings->set_painter_number_points_x(settingsJson["painterNumberPointsX"]);
-    settings->set_painter_number_points_y(settingsJson["painterNumberPointsY"]);
-    settings->set_painter_logarithmic_scale(settingsJson["painterLogarithmicScale"]);
-    settings->set_painter_include_fringing(settingsJson["painterIncludeFringing"]);
-    if (settingsJson.contains("painterMaximumValueColorbar")) {
-        settings->set_painter_maximum_value_colorbar(settingsJson["painterMaximumValueColorbar"]);
+    try {
+        auto settings = OpenMagnetics::Settings::GetInstance();
+        json settingsJson = json::parse(settingsString);
+        settings->set_coil_allow_margin_tape(settingsJson["coilAllowMarginTape"] == 1);
+        settings->set_coil_allow_insulated_wire(settingsJson["coilAllowInsulatedWire"] == 1);
+        settings->set_coil_fill_sections_with_margin_tape(settingsJson["coilFillSectionsWithMarginTape"] == 1);
+        settings->set_coil_wind_even_if_not_fit(settingsJson["coilWindEvenIfNotFit"] == 1);
+        settings->set_coil_delimit_and_compact(settingsJson["coilDelimitAndCompact"] == 1);
+        settings->set_coil_try_rewind(settingsJson["coilTryRewind"] == 1);
+        settings->set_painter_mode(settingsJson["painterMode"]);
+        settings->set_use_only_cores_in_stock(settingsJson["useOnlyCoresInStock"] == 1);
+        settings->set_painter_number_points_x(settingsJson["painterNumberPointsX"]);
+        settings->set_painter_number_points_y(settingsJson["painterNumberPointsY"]);
+        settings->set_painter_logarithmic_scale(settingsJson["painterLogarithmicScale"] == 1);
+        settings->set_painter_include_fringing(settingsJson["painterIncludeFringing"] == 1);
+        if (settingsJson.contains("painterMaximumValueColorbar")) {
+            settings->set_painter_maximum_value_colorbar(settingsJson["painterMaximumValueColorbar"]);
+        }
+        if (settingsJson.contains("painterMinimumValueColorbar")) {
+            settings->set_painter_minimum_value_colorbar(settingsJson["painterMinimumValueColorbar"]);
+        }
+        settings->set_painter_color_ferrite(settingsJson["painterColorFerrite"]);
+        settings->set_painter_color_bobbin(settingsJson["painterColorBobbin"]);
+        settings->set_painter_color_copper(settingsJson["painterColorCopper"]);
+        settings->set_painter_color_insulation(settingsJson["painterColorInsulation"]);
+        settings->set_painter_color_margin(settingsJson["painterColorMargin"]);
+        settings->set_painter_mirroring_dimension(settingsJson["painterMirroringDimension"]);
+        settings->set_magnetic_field_number_points_x(settingsJson["magneticFieldNumberPointsX"]);
+        settings->set_magnetic_field_number_points_y(settingsJson["magneticFieldNumberPointsY"]);
+        settings->set_magnetic_field_include_fringing(settingsJson["magneticFieldIncludeFringing"] == 1);
+        settings->set_magnetic_field_mirroring_dimension(settingsJson["magneticFieldMirroringDimension"] == 1);
     }
-    if (settingsJson.contains("painterMinimumValueColorbar")) {
-        settings->set_painter_minimum_value_colorbar(settingsJson["painterMinimumValueColorbar"]);
+    catch (const std::exception &exc) {
+        std::cout << std::string{exc.what()} << std::endl;
     }
-    settings->set_painter_color_ferrite(settingsJson["painterColorFerrite"]);
-    settings->set_painter_color_bobbin(settingsJson["painterColorBobbin"]);
-    settings->set_painter_color_copper(settingsJson["painterColorCopper"]);
-    settings->set_painter_color_insulation(settingsJson["painterColorInsulation"]);
-    settings->set_painter_color_margin(settingsJson["painterColorMargin"]);
-    settings->set_painter_mirroring_dimension(settingsJson["painterMirroringDimension"]);
-    settings->set_magnetic_field_number_points_x(settingsJson["magneticFieldNumberPointsX"]);
-    settings->set_magnetic_field_number_points_y(settingsJson["magneticFieldNumberPointsY"]);
-    settings->set_magnetic_field_include_fringing(settingsJson["magneticFieldIncludeFringing"]);
-    settings->set_magnetic_field_mirroring_dimension(settingsJson["magneticFieldMirroringDimension"]);
 }
 
 void MKFNet::ResetSettings() {
