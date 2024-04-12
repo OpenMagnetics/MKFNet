@@ -43,7 +43,6 @@ std::string MKFNet::ReadDatabases(std::string path, bool addInternalData) {
         {
             data["coreMaterials"] = json();
             std::ifstream coreMaterials(masPath.append("core_materials.ndjson"));
-            std::cout << masPath.append("core_materials.ndjson") << std::endl;
             while (getline (coreMaterials, line)) {
                 json jf = json::parse(line);
                 data["coreMaterials"][jf["name"]] = jf;
@@ -98,26 +97,30 @@ std::string MKFNet::ReadDatabases(std::string path, bool addInternalData) {
 }
 
 OpenMagnetics::MagneticWrapper expandMagnetic(OpenMagnetics::MagneticWrapper magnetic) {
-    magnetic.get_mutable_core().get_mutable_functional_description().set_material(magnetic.get_mutable_core().get_material());
+    auto core = magnetic.get_core();
+    auto coil = magnetic.get_coil();
+    auto coreMaterial = core.get_material();
+    core.get_mutable_functional_description().set_material(coreMaterial);
 
-    if (magnetic.get_coil().get_sections_description() && !magnetic.get_coil().get_turns_description()){
-        if (!magnetic.get_core().get_processed_description()) {
-            magnetic.get_mutable_core().process_data();
-        }
+    if (!core.get_processed_description()) {
+        core.process_data();
+    }
 
-        if (magnetic.get_core().get_functional_description().get_gapping().size() > 0 && !magnetic.get_core().get_functional_description().get_gapping()[0].get_area()) {
-            magnetic.get_mutable_core().process_gap();
+    if (core.get_functional_description().get_gapping().size() > 0 && !core.get_functional_description().get_gapping()[0].get_area()) {
+        core.process_gap();
+    }
+
+    if (!coil.get_turns_description()) {
+        for (size_t windingIndex = 0; windingIndex < coil.get_functional_description().size(); windingIndex++) {
+            coil.resolve_wire(windingIndex);
         }
-        for (size_t windingIndex = 0; windingIndex < magnetic.get_coil().get_functional_description().size(); windingIndex++) {
-            magnetic.get_mutable_coil().resolve_wire(windingIndex);
-        }
-        for (size_t windingIndex = 0; windingIndex < magnetic.get_coil().get_functional_description().size(); windingIndex++)
+        for (size_t windingIndex = 0; windingIndex < coil.get_functional_description().size(); windingIndex++)
         {
-            auto wire = magnetic.get_mutable_coil().get_wires()[windingIndex];
+            auto wire = coil.get_wires()[windingIndex];
             if (wire.get_type() == OpenMagnetics::WireType::FOIL) {
                 if (!wire.get_conducting_height())
                 {
-                    auto bobbin = magnetic.get_mutable_coil().resolve_bobbin();
+                    auto bobbin = coil.resolve_bobbin();
                     OpenMagnetics::DimensionWithTolerance aux;
                     aux.set_nominal(bobbin.get_processed_description()->get_winding_windows()[0].get_height().value() * 0.8);
                     wire.set_conducting_height(aux);
@@ -187,18 +190,27 @@ OpenMagnetics::MagneticWrapper expandMagnetic(OpenMagnetics::MagneticWrapper mag
                     }
                 }
             }
-            magnetic.get_mutable_coil().get_mutable_functional_description()[windingIndex].set_wire(wire);
+            coil.get_mutable_functional_description()[windingIndex].set_wire(wire);
         }
-        if (!magnetic.get_coil().get_turns_description())
+        if (!coil.get_sections_description())
         {
-            magnetic.get_mutable_coil().wind_by_layers();
+            coil.wind();
         }
-        if (!magnetic.get_coil().get_turns_description())
-        {
-            magnetic.get_mutable_coil().wind_by_turns();
-            magnetic.get_mutable_coil().delimit_and_compact();
+        else {
+            if (!coil.get_layers_description())
+            {
+                coil.wind_by_layers();
+            }
+            if (!coil.get_turns_description())
+            {
+                coil.wind_by_turns();
+                coil.delimit_and_compact();
+            }
         }
     }
+    magnetic.set_core(core);
+    magnetic.set_coil(coil);
+
     return magnetic;
 }
 
@@ -235,6 +247,74 @@ std::string MKFNet::LoadMagnetic(std::string key, std::string magneticString, st
         // std::cout << std::string{exc.what()} << std::endl;
         return std::string{exc.what()};
     }
+}
+
+
+std::string MKFNet::LoadMagnetics(std::string keys, std::string magneticsString, std::string inputsString, bool expand) {
+    try {
+        json magneticJsons = json::parse(magneticsString);
+        json keysJson = json::parse(keys);
+        OpenMagnetics::InputsWrapper inputs(json::parse(inputsString));
+        for (size_t magneticIndex = 0; magneticIndex < magneticJsons.size(); magneticIndex++) {
+            OpenMagnetics::MagneticWrapper magnetic(magneticJsons[magneticIndex]);
+            if (expand) {
+                magnetic = expandMagnetic(magnetic);
+            }
+            OpenMagnetics::MasWrapper mas;
+            mas.set_magnetic(magnetic);
+            mas.set_inputs(inputs);
+            masDatabase[keysJson[magneticIndex]] = mas;
+        }
+        return std::to_string(masDatabase.size());
+    }
+    catch (const std::exception &exc) {
+        // std::cout << std::string{exc.what()} << std::endl;
+        return std::string{exc.what()};
+    }
+}
+
+std::string MKFNet::LoadMagneticsFromFile(std::string path, std::string inputsString, bool expand) {
+    try {
+        std::ifstream in(path);
+        std::vector<std::vector<double>> fields;
+        size_t number_read_rows = 0;
+        OpenMagnetics::InputsWrapper inputs(json::parse(inputsString));
+
+        if (in) {
+            std::string line;
+
+            while (getline(in, line)) {
+                std::stringstream sep(line);
+                std::string field;
+
+                std::vector<std::string> row_data;
+
+                while (getline(sep, field, ';')) {
+                    row_data.push_back(field);
+                }
+
+                OpenMagnetics::MagneticWrapper magnetic(json::parse(row_data[1]));
+                OpenMagnetics::MagneticManufacturerInfo manufacturerInfo;
+                manufacturerInfo.set_name("Wuerth Elektronik");
+                manufacturerInfo.set_reference(row_data[0]);
+                magnetic.set_manufacturer_info(manufacturerInfo);
+                if (expand) {
+                    magnetic = expandMagnetic(magnetic);
+                }
+                OpenMagnetics::MasWrapper mas;
+                mas.set_magnetic(magnetic);
+                mas.set_inputs(inputs);
+                masDatabase[row_data[0]] = mas;
+            }
+        }
+        return std::to_string(masDatabase.size());
+    }
+    catch (const std::exception &exc) {
+        // std::cout << std::string{exc.what()} << std::endl;
+        return std::string{exc.what()};
+    }
+
+    return "Ea";
 }
 
 std::string MKFNet::ReadMas(std::string key) {
@@ -807,7 +887,6 @@ std::string MKFNet::GetDefaultModels() {
 
 std::string MKFNet::CalculateCoreLosses(std::string magneticString, std::string inputsString, std::string modelsString) {
     try {
-
         OpenMagnetics::MagneticWrapper magnetic;
         OpenMagnetics::InputsWrapper inputs;
         OpenMagnetics::OperatingPoint operatingPoint;
@@ -884,6 +963,7 @@ std::string MKFNet::CalculateCoreLosses(std::string magneticString, std::string 
         return result.dump(4);
     }
     catch (const std::exception &exc) {
+        std::cout << std::string{exc.what()} << std::endl;
         return "Exception: " + std::string{exc.what()};
     }
 }
@@ -971,6 +1051,45 @@ std::string MKFNet::CalculateWindingLosses(std::string magneticString, std::stri
         return result.dump(4);
     }
     catch (const std::exception &exc) {
+        std::cout << std::string{exc.what()} << std::endl;
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+
+std::string MKFNet::CalculateEffectiveCurrentDensity(std::string magneticString, std::string operatingPointString, double temperature) {
+    try {
+
+        OpenMagnetics::MagneticWrapper magnetic;
+        OpenMagnetics::OperatingPoint operatingPoint;
+        if (magneticString.starts_with("{")) {
+            magnetic = OpenMagnetics::MagneticWrapper(json::parse(magneticString));
+        }
+        else {
+            magnetic = masDatabase[magneticString].get_magnetic();
+        }
+        if (operatingPointString.starts_with("{")) {
+            operatingPoint = OpenMagnetics::OperatingPoint(json::parse(operatingPointString));
+        }
+        else {
+            size_t operatingPointIndex = stoi(operatingPointString);
+            operatingPoint = masDatabase[magneticString].get_inputs().get_operating_points()[operatingPointIndex];
+        }
+
+        auto wires = magnetic.get_mutable_coil().get_wires();
+        std::vector<double> effectiveCurrentDensityPerWire;
+        double frequency = 1;
+        json result = json::array();
+        for (size_t windingIndex = 0; windingIndex < wires.size(); windingIndex++) {
+            auto wire = wires[windingIndex];
+            double rms = operatingPoint.get_mutable_excitations_per_winding()[windingIndex].get_current().value().get_processed().value().get_rms().value();
+            // effectiveCurrentDensityPerWire.push_back(calculate_effective_current_density(rms, frequency, temperature));
+            double effectiveCurrentDensity = wire.calculate_effective_current_density(rms, frequency, temperature);
+            result.push_back(std::to_string(effectiveCurrentDensity));
+        }
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        std::cout << std::string{exc.what()} << std::endl;
         return "Exception: " + std::string{exc.what()};
     }
 }
@@ -1190,6 +1309,10 @@ double MKFNet::CalculateCoreMaximumMagneticEnergy(std::string coreDataString, st
         OpenMagnetics::OperatingPoint operatingPoint;
         if (coreDataString.starts_with("{")) {
             core = OpenMagnetics::CoreWrapper(json::parse(coreDataString), false, false, false);
+            if (!core.get_processed_description()) {
+                core.process_data();
+                core.process_gap();
+            }
         }
         else {
             core = masDatabase[coreDataString].get_magnetic().get_core();

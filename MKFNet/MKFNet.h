@@ -6,6 +6,8 @@ public:
     void LoadDatabases(std::string databasesString);
     std::string LoadMas(std::string key, std::string masString, bool expand);
     std::string LoadMagnetic(std::string key, std::string magneticString, std::string inputsString, bool expand);
+    std::string LoadMagnetics(std::string keys, std::string magneticsString, std::string inputsString, bool expand);
+    std::string LoadMagneticsFromFile(std::string path, std::string inputsString, bool expand);
     std::string ReadMas(std::string key);
     std::string ReadDatabases(std::string path, bool addInternalData);
 
@@ -50,6 +52,8 @@ public:
     std::string CalculateSkinEffectLossesPerMeter(std::string wireString, std::string currentString, double temperature, double currentDivider = 1);
     std::string CalculateMagneticFieldStrengthField(std::string operatingPointString, std::string magneticString);
     std::string CalculateProximityEffectLosses(std::string coilString, double temperature, std::string windingLossesOutputString, std::string windingWindowMagneticStrengthFieldOutputString);
+
+    std::string CalculateEffectiveCurrentDensity(std::string magneticString, std::string operatingPointString, double temperature);
 
     double GetOuterDiameterEnameledRound(double conductingDiameter, int grade = 1, std::string standardString = "IEC_60317");
     double GetOuterDiameterInsulatedRound(double conductingDiameter, int numberLayers, double thicknessLayers, std::string standardString = "IEC_60317");
