@@ -124,9 +124,18 @@ file(GLOB SOURCES MKFNet.i MKFNet.cpp ${CMAKE_BINARY_DIR}/_deps/mkf-src/src/*.cp
 find_package(SWIG REQUIRED)
 include(${SWIG_USE_FILE})
 
+
+
+# set(CMAKE_BUILD_TYPE Release)
+
 # Set .Net project directory
-set(NET_PROJECT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../MKFNetTest")
-# set(NET_PROJECT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../MMM/src/MMM")
+# set(NET_PROJECT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../MKFNetTest")
+# set(NET_PROJECT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../MKFNetTest")
+if ("${NET_PROJECT_DIR}" STREQUAL "")
+    set(NET_PROJECT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../MKFNetTest")
+    # set(NET_PROJECT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../MMM/src/MMM/Windows")
+endif()
+message("NET_PROJECT_DIR: ${NET_PROJECT_DIR}")
 
 # Add swig flags here
 set(CMAKE_SWIG_FLAGS "")
