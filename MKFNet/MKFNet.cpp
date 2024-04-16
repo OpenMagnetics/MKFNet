@@ -99,7 +99,7 @@ std::string MKFNet::ReadDatabases(std::string path, bool addInternalData) {
 OpenMagnetics::MagneticWrapper expandMagnetic(OpenMagnetics::MagneticWrapper magnetic) {
     auto core = magnetic.get_core();
     auto coil = magnetic.get_coil();
-    auto coreMaterial = core.get_material();
+    auto coreMaterial = core.resolve_material();
     core.get_mutable_functional_description().set_material(coreMaterial);
 
     if (!core.get_processed_description()) {
@@ -943,7 +943,7 @@ std::string MKFNet::CalculateCoreLosses(std::string magneticString, std::string 
         magneticSimulator.set_core_losses_model_name(coreLossesModelName);
         magneticSimulator.set_core_temperature_model_name(coreTemperatureModelName);
         magneticSimulator.set_reluctance_model_name(reluctanceModelName);
-        auto coreLossesOutput = magneticSimulator.calculate_core_loses(operatingPoint, magnetic);
+        auto coreLossesOutput = magneticSimulator.calculate_core_losses(operatingPoint, magnetic);
         json result;
         to_json(result, coreLossesOutput);
 
