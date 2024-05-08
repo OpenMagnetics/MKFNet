@@ -430,7 +430,7 @@ std::string MKFNet::GetCoreMaterialNames() {
 
 std::string MKFNet::GetCoreShapeNames() {
     try {
-        auto shapeNames = OpenMagnetics::get_shape_names(true);
+        auto shapeNames = OpenMagnetics::get_shape_names();
         json result = json::array();
         for (auto elem : shapeNames) {
             result.push_back(elem);
