@@ -225,7 +225,6 @@ std::string MKFNet::LoadMas(std::string key, std::string masString, bool expand)
         return std::to_string(masDatabase.size());
     }
     catch (const std::exception &exc) {
-        // std::cout << std::string{exc.what()} << std::endl;
         return std::string{exc.what()};
     }
 }
@@ -244,7 +243,6 @@ std::string MKFNet::LoadMagnetic(std::string key, std::string magneticString, st
         return std::to_string(masDatabase.size());
     }
     catch (const std::exception &exc) {
-        // std::cout << std::string{exc.what()} << std::endl;
         return std::string{exc.what()};
     }
 }
@@ -268,7 +266,6 @@ std::string MKFNet::LoadMagnetics(std::string keys, std::string magneticsString,
         return std::to_string(masDatabase.size());
     }
     catch (const std::exception &exc) {
-        // std::cout << std::string{exc.what()} << std::endl;
         return std::string{exc.what()};
     }
 }
@@ -310,7 +307,6 @@ std::string MKFNet::LoadMagneticsFromFile(std::string path, std::string inputsSt
         return std::to_string(masDatabase.size());
     }
     catch (const std::exception &exc) {
-        // std::cout << std::string{exc.what()} << std::endl;
         return std::string{exc.what()};
     }
 
@@ -963,7 +959,6 @@ std::string MKFNet::CalculateCoreLosses(std::string magneticString, std::string 
         return result.dump(4);
     }
     catch (const std::exception &exc) {
-        std::cout << std::string{exc.what()} << std::endl;
         return "Exception: " + std::string{exc.what()};
     }
 }
@@ -1025,9 +1020,9 @@ std::string MKFNet::CalculateAdvisedMagnetics(std::string inputsString, int maxi
     }
 }
 
-std::string MKFNet::CalculateWindingLosses(std::string magneticString, std::string operatingPointString, double temperature) {
+std::string MKFNet::CalculateWindingLosses(std::string magneticString, std::string operatingPointString, double temperature, double windingLossesHarmonicAmplitudeThreshold) {
     try {
-
+        auto settings = OpenMagnetics::Settings::GetInstance();
         OpenMagnetics::MagneticWrapper magnetic;
         OpenMagnetics::OperatingPoint operatingPoint;
         if (magneticString.starts_with("{")) {
@@ -1044,14 +1039,15 @@ std::string MKFNet::CalculateWindingLosses(std::string magneticString, std::stri
             operatingPoint = masDatabase[magneticString].get_inputs().get_operating_points()[operatingPointIndex];
         }
 
-        auto windingLossesOutput = OpenMagnetics::WindingLosses().calculate_losses(magnetic, operatingPoint, temperature);
+        auto windingLossesModel = OpenMagnetics::WindingLosses(); 
+        settings->set_harmonic_amplitude_threshold(windingLossesHarmonicAmplitudeThreshold);
+        auto windingLossesOutput = windingLossesModel.calculate_losses(magnetic, operatingPoint, temperature);
 
         json result;
         to_json(result, windingLossesOutput);
         return result.dump(4);
     }
     catch (const std::exception &exc) {
-        std::cout << std::string{exc.what()} << std::endl;
         return "Exception: " + std::string{exc.what()};
     }
 }
@@ -1089,7 +1085,6 @@ std::string MKFNet::CalculateEffectiveCurrentDensity(std::string magneticString,
         return result.dump(4);
     }
     catch (const std::exception &exc) {
-        std::cout << std::string{exc.what()} << std::endl;
         return "Exception: " + std::string{exc.what()};
     }
 }
@@ -1325,12 +1320,19 @@ double MKFNet::CalculateCoreMaximumMagneticEnergy(std::string coreDataString, st
             operatingPoint = masDatabase[coreDataString].get_inputs().get_operating_points()[operatingPointIndex];
         }
         auto magneticEnergy = OpenMagnetics::MagneticEnergy({});
-        auto coreMaximumMagneticEnergy = magneticEnergy.calculate_core_maximum_magnetic_energy(core, &operatingPoint);
+
+        double coreMaximumMagneticEnergy;
+        if (operatingPoint.get_excitations_per_winding().size() == 0) {
+            coreMaximumMagneticEnergy = magneticEnergy.calculate_core_maximum_magnetic_energy(core, nullptr);
+        }
+        else {
+            coreMaximumMagneticEnergy = magneticEnergy.calculate_core_maximum_magnetic_energy(core, &operatingPoint);
+        }
         return coreMaximumMagneticEnergy;
     }
     catch (const std::exception &exc) {
         std::cout << "Exception: " + std::string{exc.what()} << std::endl;
-        return false;
+        return -1;
     }
 }
 
@@ -1504,4 +1506,152 @@ void MKFNet::SetSettings(std::string settingsString) {
 void MKFNet::ResetSettings() {
     auto settings = OpenMagnetics::Settings::GetInstance();
     settings->reset();
+}
+
+
+
+std::string MKFNet::CalculateInductanceAndMagneticFluxDensity(std::string coreData, std::string coilData, std::string operatingPointData, std::string modelsData){
+    try {
+        OpenMagnetics::CoreWrapper core(json::parse(coreData));
+        OpenMagnetics::CoilWrapper coil(json::parse(coilData));
+        OpenMagnetics::OperatingPoint operatingPoint(json::parse(operatingPointData));
+
+        std::map<std::string, std::string> models = json::parse(modelsData).get<std::map<std::string, std::string>>();
+
+        auto reluctanceModelName = OpenMagnetics::Defaults().reluctanceModelDefault;
+        if (models.find("reluctance") != models.end()) {
+            std::string modelNameStringUpper = models["reluctance"];
+            std::transform(modelNameStringUpper.begin(), modelNameStringUpper.end(), modelNameStringUpper.begin(), ::toupper);
+            reluctanceModelName = magic_enum::enum_cast<OpenMagnetics::ReluctanceModels>(modelNameStringUpper).value();
+        }
+
+        OpenMagnetics::MagnetizingInductance magnetizing_inductance(reluctanceModelName);
+        auto magnetizingInductanceAndMagneticFluxDensity = magnetizing_inductance.calculate_inductance_and_magnetic_flux_density(core, coil, &operatingPoint);
+
+        json result = json::array();
+        json magnetizingInductanceJson;
+        json magneticFluxDensityJson;
+        to_json(magnetizingInductanceJson, magnetizingInductanceAndMagneticFluxDensity.first);
+        to_json(magneticFluxDensityJson, magnetizingInductanceAndMagneticFluxDensity.second);
+        result.push_back(magnetizingInductanceJson);
+        result.push_back(magneticFluxDensityJson);
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+
+
+std::string MKFNet::CalculateInductanceFromNumberTurnsAndGapping(std::string coreData, std::string coilData, std::string operatingPointData, std::string modelsData){
+    try {
+        OpenMagnetics::CoreWrapper core(json::parse(coreData));
+        OpenMagnetics::CoilWrapper coil(json::parse(coilData));
+
+        std::map<std::string, std::string> models = json::parse(modelsData).get<std::map<std::string, std::string>>();
+
+        auto reluctanceModelName = OpenMagnetics::Defaults().reluctanceModelDefault;
+        if (models.find("reluctance") != models.end()) {
+            std::string modelNameStringUpper = models["reluctance"];
+            std::transform(modelNameStringUpper.begin(), modelNameStringUpper.end(), modelNameStringUpper.begin(), ::toupper);
+            reluctanceModelName = magic_enum::enum_cast<OpenMagnetics::ReluctanceModels>(modelNameStringUpper).value();
+        }
+
+        OpenMagnetics::MagnetizingInductance magnetizing_inductance(reluctanceModelName);
+
+        OpenMagnetics::MagnetizingInductanceOutput magnetizingInductanceOutput;
+        if (operatingPointData != "null") {
+            OpenMagnetics::OperatingPoint operatingPoint(json::parse(operatingPointData));
+            if (operatingPoint.get_excitations_per_winding().size() == 0) {
+                magnetizingInductanceOutput = magnetizing_inductance.calculate_inductance_from_number_turns_and_gapping(core, coil, nullptr);
+            }
+            else {
+                magnetizingInductanceOutput = magnetizing_inductance.calculate_inductance_from_number_turns_and_gapping(core, coil, &operatingPoint);
+            }
+        }
+        else {
+            magnetizingInductanceOutput = magnetizing_inductance.calculate_inductance_from_number_turns_and_gapping(core, coil, nullptr);
+        }
+
+        json result;
+        to_json(result, magnetizingInductanceOutput);
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+
+
+int MKFNet::CalculateNumberTurnsFromGappingAndInductance(std::string coreData, std::string inputsData, std::string modelsData){
+    try {
+        OpenMagnetics::CoreWrapper core(json::parse(coreData));
+        OpenMagnetics::InputsWrapper inputs(json::parse(inputsData));
+
+        std::map<std::string, std::string> models = json::parse(modelsData).get<std::map<std::string, std::string>>();
+        
+        auto reluctanceModelName = OpenMagnetics::Defaults().reluctanceModelDefault;
+        if (models.find("reluctance") != models.end()) {
+            std::string modelNameStringUpper = models["reluctance"];
+            std::transform(modelNameStringUpper.begin(), modelNameStringUpper.end(), modelNameStringUpper.begin(), ::toupper);
+            reluctanceModelName = magic_enum::enum_cast<OpenMagnetics::ReluctanceModels>(modelNameStringUpper).value();
+        }
+
+        OpenMagnetics::MagnetizingInductance magnetizing_inductance(reluctanceModelName);
+        int numberTurns = magnetizing_inductance.calculate_number_turns_from_gapping_and_inductance(core, &inputs);
+
+        return numberTurns;
+    }
+    catch (const std::exception &exc) {
+        return -1;
+    }
+}
+
+
+std::string MKFNet::CalculateGappingFromNumberTurnsAndInductance(std::string coreData, std::string coilData, std::string inputsData, std::string gappingTypeString, int decimals, std::string modelsData){
+    try {
+        OpenMagnetics::CoreWrapper core(json::parse(coreData));
+        OpenMagnetics::CoilWrapper coil(json::parse(coilData));
+        json inputsJson = json::parse(inputsData);
+        OpenMagnetics::InputsWrapper inputs;
+        OpenMagnetics::from_json(inputsJson, inputs);
+
+        std::transform(gappingTypeString.begin(), gappingTypeString.end(), gappingTypeString.begin(), ::toupper);
+
+        std::map<std::string, std::string> models = json::parse(modelsData).get<std::map<std::string, std::string>>();
+        OpenMagnetics::GappingType gappingType = magic_enum::enum_cast<OpenMagnetics::GappingType>(gappingTypeString).value();
+        
+        auto reluctanceModelName = OpenMagnetics::Defaults().reluctanceModelDefault;
+        if (models.find("reluctance") != models.end()) {
+            std::string modelNameStringUpper = models["reluctance"];
+            std::transform(modelNameStringUpper.begin(), modelNameStringUpper.end(), modelNameStringUpper.begin(), ::toupper);
+            reluctanceModelName = magic_enum::enum_cast<OpenMagnetics::ReluctanceModels>(modelNameStringUpper).value();
+        }
+
+        OpenMagnetics::MagnetizingInductance magnetizing_inductance(reluctanceModelName);
+        std::vector<OpenMagnetics::CoreGap> gapping = magnetizing_inductance.calculate_gapping_from_number_turns_and_inductance(core,
+                                                                                                           coil,
+                                                                                                           &inputs,
+                                                                                                           gappingType,
+                                                                                                           decimals);
+
+        core.set_processed_description(std::nullopt);
+        core.set_geometrical_description(std::nullopt);
+        core.get_mutable_functional_description().set_gapping(gapping);
+        core.process_data();
+        core.process_gap();
+        auto geometricalDescription = core.create_geometrical_description();
+        core.set_geometrical_description(geometricalDescription);
+
+        json result = json::array();
+        for (auto gap : core.get_functional_description().get_gapping()) {
+            json aux;
+            to_json(aux, gap);
+            result.push_back(aux);
+        }
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
 }

@@ -43,7 +43,7 @@ public:
     std::string CalculateCoreLosses(std::string magneticString, std::string inputsData, std::string modelsData);
     std::string CalculateAdvisedCores(std::string inputsString, std::string weightsString, int maximumNumberResults, bool useOnlyCoresInStock);
     std::string CalculateAdvisedMagnetics(std::string inputsString, int maximumNumberResults);
-    std::string CalculateWindingLosses(std::string magneticString, std::string operatingPointString, double temperature);
+    std::string CalculateWindingLosses(std::string magneticString, std::string operatingPointString, double temperature, double windingLossesHarmonicAmplitudeThreshold);
     std::string CalculateCoreProcessedDescription(std::string coreDataString);
     std::string CalculateCoreGeometricalDescription(std::string coreDataString);
     std::string CalculateCoreGapping(std::string coreDataString);
@@ -52,6 +52,11 @@ public:
     std::string CalculateSkinEffectLossesPerMeter(std::string wireString, std::string currentString, double temperature, double currentDivider = 1);
     std::string CalculateMagneticFieldStrengthField(std::string operatingPointString, std::string magneticString);
     std::string CalculateProximityEffectLosses(std::string coilString, double temperature, std::string windingLossesOutputString, std::string windingWindowMagneticStrengthFieldOutputString);
+
+    std::string CalculateInductanceAndMagneticFluxDensity(std::string coreData, std::string coilData, std::string operatingPointData, std::string modelsData);
+    std::string CalculateInductanceFromNumberTurnsAndGapping(std::string coreData, std::string coilData, std::string operatingPointData, std::string modelsData);
+    int CalculateNumberTurnsFromGappingAndInductance(std::string coreData, std::string inputsData, std::string modelsData);
+    std::string CalculateGappingFromNumberTurnsAndInductance(std::string coreData, std::string coilData, std::string inputsData, std::string gappingTypeString, int decimals, std::string modelsData);
 
     std::string CalculateEffectiveCurrentDensity(std::string magneticString, std::string operatingPointString, double temperature);
 
