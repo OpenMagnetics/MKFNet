@@ -1,3 +1,5 @@
+sudo apt install swig
+
 # Compile MKFNet
 
 cd MKFNet

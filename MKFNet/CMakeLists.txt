@@ -84,7 +84,7 @@ endif()
 
 FetchContent_Declare(MKF
         GIT_REPOSITORY https://github.com/OpenMagnetics/MKF.git
-        GIT_TAG 2b25b757d12beba98b2ed76548ebc4f18f837f60)
+        GIT_TAG a7b1ca4)
 
 FetchContent_Declare(magic-enum
         GIT_REPOSITORY https://github.com/Neargye/magic_enum
@@ -94,7 +94,7 @@ FetchContent_MakeAvailable(magic-enum)
 FetchContent_Declare(
        mas
        GIT_REPOSITORY https://github.com/OpenMagnetics/MAS.git
-       GIT_TAG main
+       GIT_TAG 14064ce
 )
 FetchContent_GetProperties(mas)
 FetchContent_GetProperties(MKF)
@@ -110,7 +110,7 @@ message(STATUS ${MAS_SOURCE_DIR})
 
 add_custom_command(
   OUTPUT "${MAS_DIRECTORY}/MAS.hpp"
-  COMMAND quicktype -l c++ -s schema ${MAS_DIR}/schemas/MAS.json -S ${MAS_DIR}/schemas/magnetic.json -S ${MAS_DIR}/schemas/magnetic/core.json -S ${MAS_DIR}/schemas/magnetic/coil.json -S ${MAS_DIR}/schemas/utils.json -S ${MAS_DIR}/schemas/magnetic/core/gap.json -S ${MAS_DIR}/schemas/magnetic/core/shape.json -S ${MAS_DIR}/schemas/magnetic/core/material.json -S ${MAS_DIR}/schemas/magnetic/insulation/material.json -S ${MAS_DIR}/schemas/magnetic/insulation/wireCoating.json -S ${MAS_DIR}/schemas/magnetic/bobbin.json -S ${MAS_DIR}/schemas/magnetic/core/piece.json -S ${MAS_DIR}/schemas/magnetic/core/spacer.json -S ${MAS_DIR}/schemas/magnetic/wire/basicWire.json -S ${MAS_DIR}/schemas/magnetic/wire/round.json -S ${MAS_DIR}/schemas/magnetic/wire/rectangular.json -S ${MAS_DIR}/schemas/magnetic/wire/foil.json -S ${MAS_DIR}/schemas/magnetic/wire/planar.json -S ${MAS_DIR}/schemas/magnetic/wire/litz.json -S ${MAS_DIR}/schemas/magnetic/wire/material.json -S ${MAS_DIR}/schemas/magnetic/wire.json -S ${MAS_DIR}/schemas/utils.json -S ${MAS_DIR}/schemas/magnetic/insulation/wireCoating.json -S ${MAS_DIR}/schemas/magnetic/insulation/material.json -S ${MAS_DIR}/schemas/inputs.json -S ${MAS_DIR}/schemas/outputs.json -S ${MAS_DIR}/schemas/inputs/designRequirements.json -S ${MAS_DIR}/schemas/inputs/operatingConditions.json -S ${MAS_DIR}/schemas/inputs/operatingPointExcitation.json -o ${MAS_DIRECTORY}/MAS.hpp --namespace OpenMagnetics --source-style single-source --type-style pascal-case --member-style underscore-case --enumerator-style upper-underscore-case --no-boost
+  COMMAND quicktype -l c++ -s schema ${MAS_DIR}/schemas/MAS.json -S ${MAS_DIR}/schemas/magnetic.json -S ${MAS_DIR}/schemas/magnetic/core.json -S ${MAS_DIR}/schemas/magnetic/coil.json -S ${MAS_DIR}/schemas/utils.json -S ${MAS_DIR}/schemas/magnetic/core/gap.json -S ${MAS_DIR}/schemas/magnetic/core/shape.json -S ${MAS_DIR}/schemas/magnetic/core/material.json -S ${MAS_DIR}/schemas/magnetic/insulation/material.json -S ${MAS_DIR}/schemas/magnetic/insulation/wireCoating.json -S ${MAS_DIR}/schemas/magnetic/bobbin.json -S ${MAS_DIR}/schemas/magnetic/core/piece.json -S ${MAS_DIR}/schemas/magnetic/core/spacer.json -S ${MAS_DIR}/schemas/magnetic/wire/basicWire.json -S ${MAS_DIR}/schemas/magnetic/wire/round.json -S ${MAS_DIR}/schemas/magnetic/wire/rectangular.json -S ${MAS_DIR}/schemas/magnetic/wire/foil.json -S ${MAS_DIR}/schemas/magnetic/wire/planar.json -S ${MAS_DIR}/schemas/magnetic/wire/litz.json -S ${MAS_DIR}/schemas/magnetic/wire/material.json -S ${MAS_DIR}/schemas/magnetic/wire.json -S ${MAS_DIR}/schemas/utils.json -S ${MAS_DIR}/schemas/magnetic/insulation/wireCoating.json -S ${MAS_DIR}/schemas/magnetic/insulation/material.json -S ${MAS_DIR}/schemas/inputs.json -S ${MAS_DIR}/schemas/outputs.json -S ${MAS_DIR}/schemas/outputs/coreLossesOutput.json -S ${MAS_DIR}/schemas/inputs/designRequirements.json -S ${MAS_DIR}/schemas/inputs/operatingPoint.json -S ${MAS_DIR}/schemas/inputs/operatingConditions.json -S ${MAS_DIR}/schemas/inputs/operatingPointExcitation.json -o ${MAS_DIRECTORY}/MAS.hpp --namespace OpenMagnetics --source-style single-source --type-style pascal-case --member-style underscore-case --enumerator-style upper-underscore-case --no-boost
   USES_TERMINAL)
 
 add_custom_target(MASNetGeneration
