@@ -84,7 +84,7 @@ endif()
 
 FetchContent_Declare(MKF
         GIT_REPOSITORY https://github.com/OpenMagnetics/MKF.git
-        GIT_TAG f113abd42ed47701f142e2b483ad186c7b12366b)
+        GIT_TAG 3d6a7da438469414042228d0bacf0ec2b4ab67ec)
 
 FetchContent_Declare(magic-enum
         GIT_REPOSITORY https://github.com/Neargye/magic_enum
@@ -94,7 +94,7 @@ FetchContent_MakeAvailable(magic-enum)
 FetchContent_Declare(
        mas
        GIT_REPOSITORY https://github.com/OpenMagnetics/MAS.git
-       GIT_TAG a16bb60d6e937ee22836fc325bedcaa4a7337419
+       GIT_TAG 617b4fa64fecda35be5f40cfa831296827570aff
 )
 FetchContent_GetProperties(mas)
 FetchContent_GetProperties(MKF)
