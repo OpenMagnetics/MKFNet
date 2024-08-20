@@ -84,7 +84,7 @@ endif()
 
 FetchContent_Declare(MKF
         GIT_REPOSITORY https://github.com/OpenMagnetics/MKF.git
-        GIT_TAG a7b1ca43743e718956f703ee573d0cde8ed5c79f)
+        GIT_TAG f113abd42ed47701f142e2b483ad186c7b12366b)
 
 FetchContent_Declare(magic-enum
         GIT_REPOSITORY https://github.com/Neargye/magic_enum
