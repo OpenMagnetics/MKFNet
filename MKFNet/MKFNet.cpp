@@ -1655,3 +1655,77 @@ std::string MKFNet::CalculateGappingFromNumberTurnsAndInductance(std::string cor
         return "Exception: " + std::string{exc.what()};
     }
 }
+
+
+
+std::string MKFNet::Simulate(std::string inputsString, std::string magneticString, std::string modelsData){
+    try {
+        OpenMagnetics::MagneticWrapper magnetic(json::parse(magneticString));
+        OpenMagnetics::InputsWrapper inputs(json::parse(inputsString));
+
+        auto defaults = OpenMagnetics::Defaults();
+
+        std::map<std::string, std::string> models = json::parse(modelsData).get<std::map<std::string, std::string>>();
+
+        auto reluctanceModelName = defaults.reluctanceModelDefault;
+        if (models.find("reluctance") != models.end()) {
+            std::string modelNameStringUpper = models["reluctance"];
+            std::transform(modelNameStringUpper.begin(), modelNameStringUpper.end(), modelNameStringUpper.begin(), ::toupper);
+            reluctanceModelName = magic_enum::enum_cast<OpenMagnetics::ReluctanceModels>(modelNameStringUpper).value();
+        }
+        auto coreLossesModelName = defaults.coreLossesModelDefault;
+        if (models.find("coreLosses") != models.end()) {
+            std::string modelNameStringUpper = models["coreLosses"];
+            std::transform(modelNameStringUpper.begin(), modelNameStringUpper.end(), modelNameStringUpper.begin(), ::toupper);
+            coreLossesModelName = magic_enum::enum_cast<OpenMagnetics::CoreLossesModels>(modelNameStringUpper).value();
+        }
+        auto coreTemperatureModelName = defaults.coreTemperatureModelDefault;
+        if (models.find("coreTemperature") != models.end()) {
+            std::string modelNameStringUpper = models["coreTemperature"];
+            std::transform(modelNameStringUpper.begin(), modelNameStringUpper.end(), modelNameStringUpper.begin(), ::toupper);
+            coreTemperatureModelName = magic_enum::enum_cast<OpenMagnetics::CoreTemperatureModels>(modelNameStringUpper).value();
+        }
+
+        OpenMagnetics::MagneticSimulator magneticSimulator;
+
+        magneticSimulator.set_core_losses_model_name(coreLossesModelName);
+        magneticSimulator.set_core_temperature_model_name(coreTemperatureModelName);
+        magneticSimulator.set_reluctance_model_name(reluctanceModelName);
+        auto mas = magneticSimulator.simulate(inputs, magnetic);
+
+        json result;
+        to_json(result, mas);
+
+        return result.dump(4);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
+}
+
+
+std::string MKFNet::CalculateProcessed(std::string harmonicsString, std::string waveformString) {
+    OpenMagnetics::Waveform waveform;
+    OpenMagnetics::Harmonics harmonics;
+    OpenMagnetics::from_json(json::parse(waveformString), waveform);
+    OpenMagnetics::from_json(json::parse(harmonicsString), harmonics);
+
+    auto processed = OpenMagnetics::InputsWrapper::calculate_processed_data(harmonics, waveform, true);
+
+    json result;
+    to_json(result, processed);
+    return result.dump(4);
+}
+
+
+std::string MKFNet::CalculateHarmonics(std::string waveformString, double frequency) {
+    OpenMagnetics::Waveform waveform;
+    OpenMagnetics::from_json(json::parse(waveformString), waveform);
+
+    auto sampledCurrentWaveform = OpenMagnetics::InputsWrapper::calculate_sampled_waveform(waveform, frequency);
+    auto harmonics = OpenMagnetics::InputsWrapper::calculate_harmonics_data(sampledCurrentWaveform, frequency);
+
+    json result;
+    to_json(result, harmonics);
+    return result.dump(4);
+}

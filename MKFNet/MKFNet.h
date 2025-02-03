@@ -60,6 +60,10 @@ public:
 
     std::string CalculateEffectiveCurrentDensity(std::string magneticString, std::string operatingPointString, double temperature);
 
+    std::string Simulate(std::string inputsString, std::string magneticString, std::string modelsData);
+    std::string CalculateProcessed(std::string harmonicsString, std::string waveformString);
+    std::string CalculateHarmonics(std::string waveformString, double frequency);
+
     double GetOuterDiameterEnameledRound(double conductingDiameter, int grade = 1, std::string standardString = "IEC_60317");
     double GetOuterDiameterInsulatedRound(double conductingDiameter, int numberLayers, double thicknessLayers, std::string standardString = "IEC_60317");
     double GetOuterDiameterServedLitz(double conductingDiameter, int numberConductors, int grade = 1, int numberLayers= 1, std::string standardString = "IEC_60317");
