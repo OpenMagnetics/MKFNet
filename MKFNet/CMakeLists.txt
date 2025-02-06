@@ -6,6 +6,11 @@ option(BUILD_TESTS      "Build tests"    OFF)
 option(BUILD_EXAMPLES   "Build examples" OFF)
 option(UTPP_INCLUDE_TESTS_IN_BUILD   "Build tests" OFF)
 option(INCLUDE_MKF_TESTS      "Build tests"    OFF)
+option(BUILD_TESTS      "Build tests"    OFF)
+option(BUILD_EXAMPLES   "Build examples" OFF)
+option(BUILD_DEMO   "Build examples" FALSE)
+option(HAVE_LAPACK   "HAVE_LAPACK" 0)
+
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -55,6 +60,13 @@ message(STATUS ${MKF_DIR})
 
 include(FetchContent)
 
+message("Using for Levmar: ${CMAKE_BINARY_DIR}/_deps/levmar-2.6")
+file(DOWNLOAD https://users.ics.forth.gr/~lourakis/levmar/levmar-2.6.tgz ${CMAKE_BINARY_DIR}/_deps/levmar-2.6.tgz SHOW_PROGRESS)
+execute_process(COMMAND ${CMAKE_COMMAND} -E tar -xzvf ${CMAKE_BINARY_DIR}/_deps/levmar-2.6.tgz)
+execute_process(COMMAND ${CMAKE_COMMAND} -E rename levmar-2.6 ${CMAKE_BINARY_DIR}/_deps/levmar-2.6)
+add_subdirectory("${CMAKE_BINARY_DIR}/_deps/levmar-2.6" "${CMAKE_BINARY_DIR}/_deps/levmar-2.6")
+include_directories("${CMAKE_BINARY_DIR}/_deps/levmar-2.6")
+
 FetchContent_Declare(json
     GIT_REPOSITORY https://github.com/nlohmann/json/
     GIT_TAG  tags/v3.11.2)
@@ -84,7 +96,7 @@ endif()
 
 FetchContent_Declare(MKF
         GIT_REPOSITORY https://github.com/OpenMagnetics/MKF.git
-        GIT_TAG 0916cd794c4faf70bda92c34aa43ae402a27b1a1)
+        GIT_TAG 3a92d0f540943e9e3555009d541536cba4e6b5c7)
 
 FetchContent_Declare(magic-enum
         GIT_REPOSITORY https://github.com/Neargye/magic_enum
@@ -94,7 +106,7 @@ FetchContent_MakeAvailable(magic-enum)
 FetchContent_Declare(
        mas
        GIT_REPOSITORY https://github.com/OpenMagnetics/MAS.git
-       GIT_TAG 617b4fa64fecda35be5f40cfa831296827570aff
+       GIT_TAG 8aee832fe922af9432f869dcce520ca4a09a6d68
 )
 FetchContent_GetProperties(mas)
 FetchContent_GetProperties(MKF)
@@ -172,9 +184,9 @@ set_target_properties( MKFNet
 
 
 
-target_link_libraries(MKFNet PUBLIC nlohmann_json::nlohmann_json matplot)
+target_link_libraries(MKFNet PUBLIC nlohmann_json::nlohmann_json matplot levmar)
 
-add_dependencies(MKFNet MASNetGeneration)
+add_dependencies(MKFNet MASNetGeneration levmar)
 
 
 file(DOWNLOAD "https://raw.githubusercontent.com/vector-of-bool/cmrc/master/CMakeRC.cmake"
@@ -191,6 +203,7 @@ cmrc_add_resource_library(data ALIAS data::data NAMESPACE data WHENCE ${MAS_DIR}
 target_link_libraries(MKFNet PUBLIC data::data)
 
 
+include_directories("${CMAKE_BINARY_DIR}/_deps/levmar-2.6")
 include_directories("${CMAKE_BINARY_DIR}/_deps/json-src/include/nlohmann/")
 include_directories("${CMAKE_BINARY_DIR}/_deps/pybind11-src/include/")
 include_directories("${CMAKE_BINARY_DIR}/_deps/pybind11_json-src/include/pybind11_json/")

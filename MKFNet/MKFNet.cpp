@@ -18,6 +18,7 @@
 #include "WindingProximityEffectLosses.h"
 #include "WindingOhmicLosses.h"
 #include "CoreLosses.h"
+#include "Temperature.h"
 #include "CoreTemperature.h"
 #include "CoreAdviser.h"
 #include "Utils.h"
@@ -907,7 +908,7 @@ std::string MKFNet::CalculateCoreLosses(std::string magneticString, std::string 
         OpenMagnetics::OperatingPointExcitation excitation = operatingPoint.get_excitations_per_winding()[0];
         double magnetizingInductance = OpenMagnetics::resolve_dimensional_values(inputs.get_design_requirements().get_magnetizing_inductance());
         if (!excitation.get_current()) {
-            auto magnetizingCurrent = OpenMagnetics::InputsWrapper::calculate_magnetizing_current(excitation, magnetizingInductance);
+            auto magnetizingCurrent = OpenMagnetics::InputsWrapper::calculate_magnetizing_current(excitation, magnetizingInductance, true, 0.0);
             excitation.set_current(magnetizingCurrent);
             operatingPoint.get_mutable_excitations_per_winding()[0] = excitation;
         }
@@ -1728,4 +1729,15 @@ std::string MKFNet::CalculateHarmonics(std::string waveformString, double freque
     json result;
     to_json(result, harmonics);
     return result.dump(4);
+}
+
+
+double MKFNet::CalculateSaturationCurrent(std::string magneticString, double temperature) {
+    OpenMagnetics::MagneticWrapper magnetic(json::parse(magneticString));
+    return magnetic.calculate_saturation_current(temperature);
+}
+
+double MKFNet::CalculateTemperatureFromCoreThermalResistance(std::string coreString, double totalLosses) {
+    OpenMagnetics::CoreWrapper core(json::parse(coreString));
+    return OpenMagnetics::Temperature::calculate_temperature_from_core_thermal_resistance(core, totalLosses);
 }

@@ -74,6 +74,9 @@ public:
 
     double CalculateCoreMaximumMagneticEnergy(std::string coreDataString, std::string operatingPointString);
     double CalculateRequiredMagneticEnergy(std::string inputsString);
+    double CalculateSaturationCurrent(std::string magneticString, double temperature);
+    double CalculateTemperatureFromCoreThermalResistance(std::string coreString, double totalLosses);
+
 
     bool PlotField(std::string magneticString, std::string operatingPointString, std::string outFile);
     bool PlotCore(std::string magneticString, std::string outFile);
