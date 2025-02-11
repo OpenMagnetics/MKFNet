@@ -1733,11 +1733,21 @@ std::string MKFNet::CalculateHarmonics(std::string waveformString, double freque
 
 
 double MKFNet::CalculateSaturationCurrent(std::string magneticString, double temperature) {
-    OpenMagnetics::MagneticWrapper magnetic(json::parse(magneticString));
-    return magnetic.calculate_saturation_current(temperature);
+    try {
+        OpenMagnetics::MagneticWrapper magnetic(json::parse(magneticString));
+        return magnetic.calculate_saturation_current(temperature);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
 }
 
-double MKFNet::CalculateTemperatureFromCoreThermalResistance(std::string coreString, double totalLosses) {
-    OpenMagnetics::CoreWrapper core(json::parse(coreString));
-    return OpenMagnetics::Temperature::calculate_temperature_from_core_thermal_resistance(core, totalLosses);
+double MKFNet::CalculateTemperatureFromCoreThermalResistance(std::string coreDataString, double totalLosses) {
+    try {
+        OpenMagnetics::CoreWrapper core(json::parse(coreDataString), false, false, false);
+        return OpenMagnetics::Temperature::calculate_temperature_from_core_thermal_resistance(core, totalLosses);
+    }
+    catch (const std::exception &exc) {
+        return "Exception: " + std::string{exc.what()};
+    }
 }
