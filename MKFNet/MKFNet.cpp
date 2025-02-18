@@ -1738,7 +1738,8 @@ double MKFNet::CalculateSaturationCurrent(std::string magneticString, double tem
         return magnetic.calculate_saturation_current(temperature);
     }
     catch (const std::exception &exc) {
-        return "Exception: " + std::string{exc.what()};
+        std::cout << "Exception: " + std::string{exc.what()} << std::endl;
+        return -1;
     }
 }
 
@@ -1748,6 +1749,7 @@ double MKFNet::CalculateTemperatureFromCoreThermalResistance(std::string coreDat
         return OpenMagnetics::Temperature::calculate_temperature_from_core_thermal_resistance(core, totalLosses);
     }
     catch (const std::exception &exc) {
-        return "Exception: " + std::string{exc.what()};
+        std::cout << "Exception: " + std::string{exc.what()} << std::endl;
+        return -1;
     }
 }
